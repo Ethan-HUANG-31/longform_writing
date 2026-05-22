@@ -43,6 +43,9 @@ You are a chapter planner.
 [Relevant Codex]
 {{relevant_codex}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Write the current chapter summary as a concrete plan.
 
 ## Failure Cases

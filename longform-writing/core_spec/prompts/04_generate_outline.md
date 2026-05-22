@@ -35,6 +35,9 @@ You are an outline planner.
 [Relevant Codex]
 {{relevant_codex}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Generate {{target_chapters}} chapters:
 [
   {
@@ -51,4 +54,3 @@ Generate {{target_chapters}} chapters:
 - Abstract chapter summaries.
 - Reveals final twist too early.
 - Omits protagonist or central conflict.
-

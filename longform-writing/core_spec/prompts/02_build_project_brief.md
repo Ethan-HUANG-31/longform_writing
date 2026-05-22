@@ -34,6 +34,9 @@ Use the request as source of truth. Make the smallest reasonable assumptions. Do
 [Parsed Requirement]
 {{parsed_requirement}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Write `01_project_brief.md` with sections:
 - Title
 - Language
@@ -57,4 +60,3 @@ Write `01_project_brief.md` with sections:
 - Brief contradicts the request.
 - Brief introduces multiple protagonists in V0.
 - Brief omits hard constraints.
-

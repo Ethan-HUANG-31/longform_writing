@@ -48,6 +48,9 @@ Be precise, concrete, and temporally coherent. Clarify ambiguity through specifi
 [Relevant Codex]
 {{relevant_codex}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Generate {{beat_count}} beats:
 [
   {

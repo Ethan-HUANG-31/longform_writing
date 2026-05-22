@@ -32,6 +32,9 @@ Extract stable facts needed for longform drafting. Keep V0 minimal and useful.
 [Project Brief]
 {{project_brief}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Return:
 {
   "version": "0.1",
@@ -55,4 +58,3 @@ Allowed scopes: global, relevant, manual.
 - Important constraints exist only in tags.
 - Too many speculative entries.
 - No global/always_include entry.
-

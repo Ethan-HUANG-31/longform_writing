@@ -39,6 +39,9 @@ Summarize only what actually happens in the text. Produce compact future memory.
 [Chapter Draft]
 {{chapter_draft}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Write a concise factual summary in running text. Use the same language as the project brief.
 
 ## Failure Cases

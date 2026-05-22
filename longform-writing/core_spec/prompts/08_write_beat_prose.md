@@ -57,6 +57,9 @@ You are an expert fiction writer.
 [Relevant Codex]
 {{relevant_codex}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 [Text Before]
 {{text_before}}
 
@@ -74,4 +77,3 @@ Write {{word_count}} words or fewer that continue the story from Text Before and
 - Reveals future information early.
 - Repeats text_before.
 - Ignores relevant Codex.
-
