@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["chapter_id", "title", "summary"],
+    "properties": {
+      "chapter_id": { "type": "integer" },
+      "title": { "type": "string" },
+      "summary": { "type": "string" },
+      "required_codex": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "must_not_reveal": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["passed", "issues"],
+  "properties": {
+    "passed": { "type": "boolean" },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "detail"],
+        "properties": {
+          "beat_id": { "type": "integer" },
+          "type": { "type": "string" },
+          "detail": { "type": "string" },
+          "severity": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Longform Writing"
+  short_description: "Draft longform fiction through structured project files."
+  default_prompt: "Use this skill to turn a fiction-writing request into a structured longform writing project with brief, codex, outline, chapter beats, drafts, summaries, manuscript, and trace records."

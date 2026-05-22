@@ -1,0 +1,43 @@
+workflow: v0_full_story_workflow
+project_root: runs/{project_slug}
+steps:
+  - id: parse_request
+    prompt: core_spec/prompts/01_parse_request.md
+    reads: [user_request]
+    writes: [00_request.md]
+  - id: build_project_brief
+    prompt: core_spec/prompts/02_build_project_brief.md
+    reads: [00_request.md]
+    writes: [01_project_brief.md]
+  - id: build_codex
+    prompt: core_spec/prompts/03_build_codex.md
+    reads: [00_request.md, 01_project_brief.md]
+    writes: [02_codex.json]
+  - id: generate_outline
+    prompt: core_spec/prompts/04_generate_outline.md
+    reads: [01_project_brief.md, 02_codex.json]
+    writes: [03_outline.json]
+  - id: generate_chapter_summary
+    prompt: core_spec/prompts/05_generate_chapter_summary.md
+    reads: [01_project_brief.md, 02_codex.json, 03_outline.json, chapters/{previous}/03_summary_after.md]
+    writes: [chapters/{chapter}/00_summary.md]
+  - id: generate_scene_beats
+    prompt: core_spec/prompts/06_generate_scene_beats.md
+    reads: [01_project_brief.md, 02_codex.json, chapters/{chapter}/00_summary.md, chapters/{previous}/03_summary_after.md]
+    writes: [chapters/{chapter}/01_beats.json]
+  - id: validate_scene_beats
+    prompt: core_spec/prompts/07_validate_scene_beats.md
+    reads: [02_codex.json, chapters/{chapter}/00_summary.md, chapters/{chapter}/01_beats.json, chapters/{previous}/03_summary_after.md]
+    writes: [run_records/step_manifest.jsonl]
+  - id: write_beat_prose
+    prompt: core_spec/prompts/08_write_beat_prose.md
+    reads: [01_project_brief.md, 02_codex.json, chapters/{chapter}/00_summary.md, chapters/{chapter}/01_beats.json, chapters/{previous}/03_summary_after.md]
+    writes: [chapters/{chapter}/02_draft.md]
+  - id: summarize_chapter
+    prompt: core_spec/prompts/09_summarize_chapter.md
+    reads: [01_project_brief.md, chapters/{chapter}/02_draft.md]
+    writes: [chapters/{chapter}/03_summary_after.md]
+  - id: merge_manuscript
+    prompt: core_spec/prompts/10_merge_manuscript.md
+    reads: [chapters/*/02_draft.md]
+    writes: [manuscript/draft_full.md, manuscript/final.md]

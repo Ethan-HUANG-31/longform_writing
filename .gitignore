@@ -1,6 +1,9 @@
 .DS_Store
 .env
 .env.*
+!.env.example
+runs/
+GPT对话记录/
 node_modules/
 dist/
 build/

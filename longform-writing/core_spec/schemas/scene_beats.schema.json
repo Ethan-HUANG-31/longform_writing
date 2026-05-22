@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["beat_id", "text"],
+    "properties": {
+      "beat_id": { "type": "integer" },
+      "text": { "type": "string" },
+      "purpose": { "type": "string" },
+      "required_codex": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "reveals": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "must_not_reveal": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}
