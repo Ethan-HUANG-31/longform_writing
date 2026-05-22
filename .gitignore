@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 runs/
+baseline_runs/
 GPT对话记录/
 node_modules/
 dist/

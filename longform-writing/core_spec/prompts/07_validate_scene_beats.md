@@ -41,6 +41,9 @@ You are a continuity validator.
 [Scene Beats]
 {{scene_beats}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Return:
 {
   "passed": true,
@@ -52,4 +55,3 @@ Return:
 - Validator lets a premature reveal pass.
 - Validator ignores contradiction with Codex.
 - Validator does not explain blocking issues.
-

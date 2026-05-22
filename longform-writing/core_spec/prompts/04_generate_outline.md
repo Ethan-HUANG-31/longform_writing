@@ -38,6 +38,9 @@ You are an outline planner.
 [Relevant Codex]
 {{relevant_codex}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 Generate {{target_chapters}} chapters:
 [
   {

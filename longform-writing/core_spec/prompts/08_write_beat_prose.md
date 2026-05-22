@@ -60,6 +60,9 @@ You are an expert fiction writer.
 [Relevant Codex]
 {{relevant_codex}}
 
+[Genre Adapter]
+{{genre_adapter}}
+
 [Text Before]
 {{text_before}}
 
