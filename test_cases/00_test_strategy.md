@@ -21,6 +21,35 @@ The earlier seven-character setup is useful as a future stress test, not as the 
 
 After the four core V0 smoke tests pass, expand validation in two phases.
 
+## Control Baselines
+
+Before claiming that the structured skill is useful, compare it with simpler baselines.
+
+Use control baselines on selected harder cases:
+
+```text
+Control A: direct write
+Control B: simple engineered write
+Treatment: full longform-writing skill
+```
+
+The controls should be evaluated on:
+
+- requirement fulfillment
+- continuity
+- reveal control
+- structural coherence
+- traceability
+- revision readiness
+
+The full skill does not need to beat direct writing on prose elegance every time. Its main value claim is stronger process control for longform writing.
+
+Recommended comparison cases:
+
+- `05_medium_length_single_protagonist`
+- `07_dual_timeline_continuity`
+- `10_mystery_clue_fairness_smoke`
+
 ### Phase B: Complexity Expansion
 
 Phase B raises story complexity without adding new workflow features.
