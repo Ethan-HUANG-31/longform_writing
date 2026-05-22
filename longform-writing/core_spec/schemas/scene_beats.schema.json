@@ -19,7 +19,8 @@
       "must_not_reveal": {
         "type": "array",
         "items": { "type": "string" }
-      }
+      },
+      "timeline": { "type": "string" }
     }
   }
 }

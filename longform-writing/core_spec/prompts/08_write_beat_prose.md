@@ -29,6 +29,9 @@ Markdown prose only.
 - Stop early if the continuation satisfies the beat.
 - Use active, concrete prose and dialogue that advances action.
 - Do not include markdown headings unless the beat requires it.
+- Preserve limited POV: do not enter any supporting character's private thoughts unless the project explicitly allows that POV.
+- If Current Beat marks past video/document content, write it as evidence being viewed, heard, read, or remembered by the current viewpoint.
+- Do not state any item listed in `must_not_reveal`.
 
 ## Prompt Template
 
@@ -74,4 +77,3 @@ Write {{word_count}} words or fewer that continue the story from Text Before and
 - Reveals future information early.
 - Repeats text_before.
 - Ignores relevant Codex.
-

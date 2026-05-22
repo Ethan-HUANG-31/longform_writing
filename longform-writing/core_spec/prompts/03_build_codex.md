@@ -19,6 +19,9 @@ JSON object matching `codex.schema.json`.
 - Create `global/always_include` entries for style, constraints, premise, and central rules.
 - Create `relevant` entries for characters, locations, objects, and rules/lore.
 - Put facts in `description`; tags are optional organization only.
+- For supporting casts, give each character a distinct role and evidence function.
+- For delayed reveals, create a rule_lore entry that names the protected fact, the allowed reveal chapter, and earlier chapters that must not state it.
+- For dual timelines, create a rule_lore entry distinguishing event chronology from revelation chronology.
 - Do not create a complex encyclopedia.
 
 ## Prompt Template
@@ -55,4 +58,3 @@ Allowed scopes: global, relevant, manual.
 - Important constraints exist only in tags.
 - Too many speculative entries.
 - No global/always_include entry.
-

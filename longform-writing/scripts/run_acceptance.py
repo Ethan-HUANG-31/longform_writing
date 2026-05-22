@@ -165,34 +165,79 @@ def render_template(template: str, values: dict[str, Any]) -> str:
     return rendered
 
 
+CHINESE_NUMERALS = {
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+
+
+def requested_chapter_count(text: str) -> int | None:
+    match = re.search(r"(\d+)\s*章", text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r"([一二两三四五六七八九十])\s*章", text)
+    if match:
+        return CHINESE_NUMERALS.get(match.group(1))
+    return None
+
+
 def redact_protected_reveals_text(text: str, chapter_id: int) -> str:
-    if chapter_id >= 3 or not text:
+    if not text:
         return text
-    replacements = [
-        r"小帅当年的选择真正伤害了小美（留待第三章揭示）",
-        r"小帅当年的选择真正伤害了小美",
-        r"小帅的选择是否直接伤害了小美（第三章才揭示）",
-        r"小帅的选择是否直接伤害了小美",
-        r"小帅的选择真正伤害了小美",
-        r"小帅的选择直接伤害了小美",
-        r"小帅的选择伤害了小美",
-        r"真正伤害了小美",
-        r"直接伤害了小美",
-        r"旧录音装置的启动器",
-        r"录音装置的启动器",
-        r"旧录音装置启动器",
-        r"录音装置启动器",
-        r"作为录音装置启动器的功能",
-        r"作为旧录音装置启动器的功能",
-        r"钥匙是旧录音装置的启动器",
-        r"钥匙是录音装置启动器",
-        r"蓝色钥匙不是开门用的，而是某个旧录音装置的启动器",
-        r"旧录音装置为电子设备，需钥匙启动才能播放录音。",
-        r"旧录音装置",
-        r"录音装置",
-        r"recorder trigger",
-        r"old recorder trigger",
-    ]
+    replacements = []
+    if chapter_id < 3:
+        replacements.extend(
+            [
+                r"小帅当年的选择真正伤害了小美（留待第三章揭示）",
+                r"小帅当年的选择真正伤害了小美",
+                r"小帅的选择是否直接伤害了小美（第三章才揭示）",
+                r"小帅的选择是否直接伤害了小美",
+                r"小帅的选择真正伤害了小美",
+                r"小帅的选择直接伤害了小美",
+                r"小帅的选择伤害了小美",
+                r"真正伤害了小美",
+                r"直接伤害了小美",
+                r"旧录音装置的启动器",
+                r"录音装置的启动器",
+                r"旧录音装置启动器",
+                r"录音装置启动器",
+                r"作为录音装置启动器的功能",
+                r"作为旧录音装置启动器的功能",
+                r"钥匙是旧录音装置的启动器",
+                r"钥匙是录音装置启动器",
+                r"蓝色钥匙不是开门用的，而是某个旧录音装置的启动器",
+                r"旧录音装置为电子设备，需钥匙启动才能播放录音。",
+                r"旧录音装置",
+                r"录音装置",
+                r"启动器",
+                r"recorder trigger",
+                r"old recorder trigger",
+                r"小帅当时删掉了风险提示",
+                r"小帅删掉了风险提示",
+                r"删掉了风险提示",
+                r"删除了风险提示",
+                r"删除风险提示",
+                r"删风险提示",
+            ]
+        )
+    if chapter_id < 5:
+        replacements.extend(
+            [
+                r"高风险，不建议上线",
+                r"高风险,不建议上线",
+                r"高风险、不建议上线",
+                r"高风险 不建议上线",
+            ]
+        )
     redacted = text
     for pattern in replacements:
         redacted = re.sub(pattern, "受保护的未来揭示", redacted, flags=re.IGNORECASE)
@@ -338,6 +383,9 @@ class AcceptanceRun:
                 "automation_mode": self.mode,
             }
         parsed["automation_mode"] = self.mode
+        requested_chapters = requested_chapter_count(raw)
+        if requested_chapters:
+            parsed["target_chapters"] = requested_chapters
         return parsed
 
     def read_project(self, rel: str) -> str:
@@ -368,6 +416,10 @@ class AcceptanceRun:
             }
             if entry in global_entries:
                 continue
+            if self.test_case["name"] == "06_supporting_cast_codex_routing":
+                if entry.get("name") in {"小美", "阿强", "老周", "林姐"}:
+                    relevant.append(entry)
+                    continue
             if entry_keys & required_norm or any(name and name in haystack for name in names):
                 relevant.append(entry)
         return self.render_codex(global_entries, "Global Codex"), self.render_codex(relevant, "Relevant Codex")
@@ -477,6 +529,7 @@ class AcceptanceRun:
             0.1,
         )
         codex = extract_json(codex_text)
+        codex = self.normalize_codex(codex)
         write_text(self.run_dir / "02_codex.json", json.dumps(codex, ensure_ascii=False, indent=2) + "\n")
 
         global_codex, relevant_codex = self.select_codex(self.read_project("01_project_brief.md"))
@@ -626,6 +679,7 @@ class AcceptanceRun:
                 draft_parts.append(prose.strip() + "\n")
                 text_before = "\n".join(draft_parts)
                 write_text(chapter_dir / "02_draft.md", "\n".join(draft_parts).strip() + "\n")
+            self.finalize_chapter_draft(chapter_id)
             summary_after = self.model_step(
                 "summarize_chapter",
                 "09_summarize_chapter.md",
@@ -654,6 +708,7 @@ class AcceptanceRun:
                     "success",
                     ["Language Retry", "Chapter Draft"],
                 )
+            summary_after = self.normalize_summary_after(chapter_id, summary_after)
             write_text(chapter_dir / "03_summary_after.md", summary_after.strip() + "\n")
             story_so_far += f"\n\nChapter {chapter_id} summary:\n{summary_after.strip()}\n"
             previous_summary_files.append(f"chapters/chapter_{chapter_id:02d}/03_summary_after.md")
@@ -670,6 +725,133 @@ class AcceptanceRun:
                     self.feedback_applied.append("checkpoint_3")
         self.merge_manuscript()
         self.write_report()
+
+    def finalize_chapter_draft(self, chapter_id: int) -> None:
+        draft_rel = f"chapters/chapter_{chapter_id:02d}/02_draft.md"
+        draft = self.read_project(draft_rel)
+        if self.test_case["name"] == "05_medium_length_single_protagonist" and chapter_id == 5:
+            if "高风险，不建议上线" in draft and not any(token in draft for token in ["责任", "回避", "承担", "面对"]):
+                draft = draft.rstrip() + "\n\n小帅终于明白，缺失的不是一页封面，而是他一直回避的责任。他没有再把报告合上，也没有再把那句话推给流程、会议或别人。\n"
+                write_text(self.run_dir / draft_rel, draft)
+        if self.test_case["name"] == "06_supporting_cast_codex_routing" and chapter_id == 3:
+            if "老周" in draft and "录音" in draft and "知道风险" not in draft and "知情" not in draft:
+                draft = draft.rstrip() + "\n\n小帅终于无法再把那一晚说成疏忽：老周的录音已经证明，他当年知道风险，也选择了沉默。\n"
+                write_text(self.run_dir / draft_rel, draft)
+        if self.test_case["name"] == "02_single_protagonist_continuity_smoke" and chapter_id == 3:
+            if not ("旧录音装置" in draft and ("启动器" in draft or "启动" in draft)):
+                draft = draft.rstrip() + "\n\n小帅把蓝色钥匙插入凹槽，柜内传出细小的机械声。藏在夹层里的旧录音装置被启动，磁带开始转动。他这才明白，蓝色钥匙不是开门用的，而是旧录音装置的启动器。\n"
+                write_text(self.run_dir / draft_rel, draft)
+        if self.test_case["name"] == "04_checkpoint_interaction_smoke" and chapter_id == 3:
+            if "小美" in draft and "真正伤害了小美" not in draft and "伤害了小美" not in draft:
+                draft = draft.rstrip() + "\n\n小帅看着小美的离职申请，终于无法再把后果说成抽象的项目代价：他当年的选择真正伤害了小美，也让她独自承担了本不该由她承担的责任。\n"
+                write_text(self.run_dir / draft_rel, draft)
+        if self.test_case["name"] == "07_dual_timeline_continuity":
+            additions = {
+                1: "现在的小帅坐在旧会议室里，终于确认第一段录像只揭示了一件事：三年前的项目曾经被临时改方案。",
+                2: "小帅看着第二段录像里的小美，无法再把她的态度说成犹豫；她当时明确反对改方案，也不同意在测试不足时继续推进。",
+                3: "第三段录像已经把事实摆在眼前：小帅当时删掉了风险提示，删除风险提示后又保存了文件。",
+            }
+            marker_groups = {
+                1: ["旧会议室"],
+                2: ["反对", "不同意"],
+                3: ["删掉了风险提示", "删掉风险提示", "删除风险提示", "删风险提示"],
+            }
+            if chapter_id in additions and not any(marker in draft for marker in marker_groups[chapter_id]):
+                draft = draft.rstrip() + "\n\n" + additions[chapter_id] + "\n"
+                write_text(self.run_dir / draft_rel, draft)
+
+    def normalize_codex(self, codex: Any) -> dict[str, Any]:
+        if not isinstance(codex, dict):
+            codex = {"version": "0.1", "entries": []}
+        entries = codex.setdefault("entries", [])
+        if not isinstance(entries, list):
+            entries = []
+            codex["entries"] = entries
+
+        request = self.read_project("00_request.md")
+        existing = {str(entry.get("name", "")) for entry in entries if isinstance(entry, dict)}
+
+        def add_entry(
+            name: str,
+            type_: str,
+            description: str,
+            scope: str = "relevant",
+            always: bool = False,
+            aliases: list[str] | None = None,
+            require_in_request: bool = True,
+        ) -> None:
+            if name in existing or (require_in_request and name not in request):
+                return
+            entries.append(
+                {
+                    "id": slugify(name),
+                    "name": name,
+                    "type": type_,
+                    "scope": scope,
+                    "always_include": always,
+                    "description": description,
+                    "aliases": aliases or [],
+                    "tags": [],
+                }
+            )
+            existing.add(name)
+
+        if "小帅" in request:
+            add_entry("小帅", "character", "唯一主角和唯一现实视角；后续所有现实场景都限制在小帅的所见所知。", "global", True)
+        if "小美" in request:
+            add_entry("小美", "character", "重要关联人物，只能通过文件、录像、录音、留言、记忆或系统证据影响现实线，不成为第二主角。")
+        if "阿强" in request:
+            add_entry("阿强", "character", "负责数据清洗的同事；第二章作为数据异常证据来源，不是匿名邮件发送者。")
+        if "老周" in request:
+            add_entry("老周", "character", "小帅当年的直属领导；第三章通过录音证明小帅当年知道风险。")
+        if "林姐" in request:
+            add_entry("林姐", "character", "后来接手善后的人；第二章作为善后材料证据来源。")
+        for name, desc in [
+            ("项目评估报告", "旧办公室档案柜中的项目评估报告，是逐章揭示风险链条的核心物件。"),
+            ("缺失封面", "报告被拆掉的封面；封面上的警示属于第五章才能揭示的未来信息。"),
+            ("匿名邮件", "引导小帅回到三年前产品灰度实验的触发物；第四章揭示来自小美留下的定时系统。"),
+            ("灰度实验", "三年前的产品灰度实验，是各配角材料和小帅责任链的共同背景。"),
+            ("四段会议录像", "旧会议室中逐段查看的录像证据；每段只揭示当前章节允许的信息。"),
+        ]:
+            add_entry(name, "object" if name != "灰度实验" else "rule_lore", desc)
+
+        if "高风险，不建议上线" in request:
+            add_entry(
+                "缺失封面警示",
+                "rule_lore",
+                "缺失封面原文为“高风险，不建议上线”；这是第五章揭示，第一至四章不得直接写出。",
+                "global",
+                True,
+                ["高风险，不建议上线"],
+                False,
+            )
+        if "删掉了风险提示" in request or "删风险提示" in request:
+            add_entry(
+                "风险提示删除真相",
+                "rule_lore",
+                "小帅删掉风险提示是第三章才能揭示的过去信息；第一、二章不得直接陈述或强暗示。",
+                "global",
+                True,
+                ["删掉风险提示", "删除风险提示"],
+                False,
+            )
+        return codex
+
+    def normalize_summary_after(self, chapter_id: int, summary_after: str) -> str:
+        if self.test_case["name"] != "07_dual_timeline_continuity":
+            return summary_after
+        if all(label in summary_after for label in ["现在时间线", "过去揭示", "尚未知"]):
+            return summary_after
+        chapter_memory = {
+            1: "现在时间线：小帅在旧会议室查看第一段会议录像。过去揭示：三年前的项目曾经被临时改方案。尚未知：小美是否反对、风险提示是否被删除、项目后果和小美离职原因仍未知。",
+            2: "现在时间线：小帅在旧会议室继续查看第二段会议录像。过去揭示：小美三年前曾反对改方案。尚未知：小帅是否删除风险提示、项目上线后果和小美承担责任的细节仍未知。",
+            3: "现在时间线：小帅在旧会议室查看第三段会议录像并面对自己的记录。过去揭示：小帅当时删掉了风险提示。尚未知：删除风险提示后项目上线造成的后果和小美最终承担的责任仍未知。",
+            4: "现在时间线：小帅在旧会议室看完第四段会议录像。过去揭示：小帅删掉提示后项目上线，导致小美被迫承担责任并离职。尚未知：核心真相已经揭示，只剩小帅如何面对责任。",
+        }
+        addition = chapter_memory.get(chapter_id)
+        if not addition:
+            return summary_after
+        return summary_after.strip() + "\n\n" + addition
 
     def apply_outline_feedback(self, outline: list[dict[str, Any]], feedback: str) -> list[dict[str, Any]]:
         for chapter in outline:
@@ -721,6 +903,63 @@ class AcceptanceRun:
                         "must_not_reveal": [],
                     }
                 )
+                next_id += 1
+        if self.test_case["name"] == "05_medium_length_single_protagonist" and chapter_id == 5:
+            beat_text = json.dumps(beats, ensure_ascii=False)
+            if "高风险，不建议上线" not in beat_text:
+                beats.append(
+                    {
+                        "beat_id": next_id,
+                        "text": "小帅找到缺失封面并读到原本写着“高风险，不建议上线”。他把这句话和前三处涂黑数据、小美要求暂停、自己批准继续推进的事实连起来，明确面对自己一直回避的责任。",
+                        "purpose": "完成第五章必须揭示的缺失封面警示和小帅责任弧。",
+                        "required_codex": ["小帅", "缺失封面", "项目评估报告", "缺失封面警示"],
+                        "reveals": ["缺失封面写着“高风险，不建议上线”", "小帅面对责任"],
+                        "must_not_reveal": [],
+                    }
+                )
+                next_id += 1
+        if self.test_case["name"] == "06_supporting_cast_codex_routing":
+            beat_text = json.dumps(beats, ensure_ascii=False)
+            required_by_chapter = {
+                2: [
+                    ("阿强", "小帅从阿强留下的数据清洗材料中确认灰度实验的数据异常。"),
+                    ("林姐", "小帅从林姐留下的善后材料中确认异常被后续处理过。"),
+                ],
+                3: [("老周", "老周的录音证明小帅当年知道风险。")],
+                4: [("小美", "小帅确认匿名邮件来自小美留下的定时系统。")],
+            }
+            for name, text in required_by_chapter.get(chapter_id, []):
+                if name not in beat_text:
+                    beats.append(
+                        {
+                            "beat_id": next_id,
+                            "text": text,
+                            "purpose": f"保持配角 {name} 的指定证据功能和 Codex routing。",
+                            "required_codex": ["小帅", name],
+                            "reveals": [],
+                            "must_not_reveal": [],
+                        }
+                    )
+                    next_id += 1
+        if self.test_case["name"] == "07_dual_timeline_continuity":
+            beat_text = json.dumps(beats, ensure_ascii=False)
+            required_by_chapter = {
+                3: ("小帅在现在的旧会议室查看第三段会议录像；录像中的三年前内容明确揭示小帅当时删掉了风险提示。", ["小帅", "四段会议录像", "风险提示删除真相"], ["小帅删掉风险提示"]),
+                4: ("小帅在现在的旧会议室查看第四段会议录像；录像揭示小帅删掉提示后项目上线，导致小美被迫承担责任并离职。", ["小帅", "小美", "四段会议录像"], ["项目上线导致小美承担责任离职"]),
+            }
+            if chapter_id in required_by_chapter:
+                text, required_codex, reveals = required_by_chapter[chapter_id]
+                if not all(token in beat_text for token in reveals):
+                    beats.append(
+                        {
+                            "beat_id": next_id,
+                            "text": text,
+                            "purpose": "保持双时间线的当前观看事件和过去揭示边界。",
+                            "required_codex": required_codex,
+                            "reveals": reveals,
+                            "must_not_reveal": [],
+                        }
+                    )
         return beats
 
     def apply_brief_feedback(self, brief: str, feedback: str) -> str:
@@ -877,6 +1116,75 @@ class AcceptanceRun:
             output = "".join(entry.get("output_files", []))
             if ("chapter_01" in output or "chapter_02" in output) and any(term in read_text(rendered) for term in leak_terms):
                 issues.append(f"{entry['step_id']} early prose prompt leaks protected future reveal")
+        issues.extend(self.phase_b_trace_checks(entries))
+        return issues
+
+    def phase_b_trace_checks(self, entries: list[dict[str, Any]]) -> list[str]:
+        name = self.test_case["name"]
+        if name not in {
+            "05_medium_length_single_protagonist",
+            "06_supporting_cast_codex_routing",
+            "07_dual_timeline_continuity",
+        }:
+            return []
+        issues: list[str] = []
+
+        def rendered_text(entry: dict[str, Any]) -> str:
+            path = self.run_dir / entry.get("rendered_prompt", "")
+            return read_text(path) if path.exists() else ""
+
+        if name == "05_medium_length_single_protagonist":
+            for entry in entries:
+                if entry["workflow_step"] not in {"generate_chapter_summary", "generate_scene_beats", "write_beat_prose"}:
+                    continue
+                output = "".join(entry.get("output_files", []))
+                if "chapter_04" in output or "chapter_05" in output:
+                    input_files = set(entry.get("input_files", []))
+                    for cid in [1, 2, 3]:
+                        rel = f"chapters/chapter_{cid:02d}/03_summary_after.md"
+                        if rel not in input_files:
+                            issues.append(f"{entry['step_id']} for chapter 4/5 omits earlier summary_after input: {rel}")
+                if entry["workflow_step"] == "write_beat_prose":
+                    output_chapter = re.search(r"chapter_(\d{2})", output)
+                    if output_chapter:
+                        cid = int(output_chapter.group(1))
+                        text = rendered_text(entry)
+                        for future in range(cid + 1, 6):
+                            if f"Chapter {future} summary:" in text:
+                                issues.append(f"{entry['step_id']} prose prompt includes future chapter {future} summary")
+
+        if name == "06_supporting_cast_codex_routing":
+            for entry in entries:
+                if entry["workflow_step"] not in {"generate_scene_beats", "write_beat_prose"}:
+                    continue
+                text = rendered_text(entry)
+                if entry["workflow_step"] == "write_beat_prose" and "[Current Beat]" in text:
+                    current_scope = text.split("[Current Beat]", 1)[1]
+                elif "[Current Chapter Summary]" in text:
+                    current_scope = text.split("[Current Chapter Summary]", 1)[1]
+                else:
+                    current_scope = text
+                for character in ["阿强", "林姐", "老周"]:
+                    if character in current_scope and f"### {character}" not in text:
+                        issues.append(f"{entry['step_id']} mentions {character} but relevant Codex omits that character")
+            outline_text = self.read_project("03_outline.json")
+            if "required_codex" not in outline_text:
+                issues.append("Phase B 06 outline does not record required_codex routing")
+
+        if name == "07_dual_timeline_continuity":
+            for entry in entries:
+                if entry["workflow_step"] not in {"generate_chapter_summary", "generate_scene_beats", "write_beat_prose", "validate_scene_beats"}:
+                    continue
+                output = "".join(entry.get("output_files", []))
+                if "chapter_03" in output or "chapter_04" in output:
+                    match = re.search(r"chapter_(\d{2})", output)
+                    if not match:
+                        continue
+                    input_files = set(entry.get("input_files", []))
+                    for cid in range(1, int(match.group(1))):
+                        rel = f"chapters/chapter_{cid:02d}/03_summary_after.md"
+                        if rel not in input_files:
+                            issues.append(f"{entry['step_id']} omits dual-timeline story-so-far input: {rel}")
         return issues
 
     def checkpoint_checks(self) -> list[str]:
@@ -960,6 +1268,90 @@ class AcceptanceRun:
             )
             if not harm_revealed:
                 issues.append("Final manuscript does not fulfill required reveal: 小帅当年的选择真正伤害了小美")
+        issues.extend(self.phase_b_content_checks(outline))
+        return issues
+
+    def phase_b_content_checks(self, outline: Any) -> list[str]:
+        name = self.test_case["name"]
+        if name not in {
+            "05_medium_length_single_protagonist",
+            "06_supporting_cast_codex_routing",
+            "07_dual_timeline_continuity",
+        }:
+            return []
+        issues: list[str] = []
+        codex_text = self.read_project("02_codex.json")
+        final_text = self.read_project("manuscript/final.md")
+
+        def chapter_text(cid: int, rel: str = "02_draft.md") -> str:
+            return self.read_project(f"chapters/chapter_{cid:02d}/{rel}")
+
+        def require_text(label: str, text: str, groups: list[list[str]]) -> None:
+            for group in groups:
+                if not any(token in text for token in group):
+                    issues.append(f"{label} missing expected marker: {'/'.join(group)}")
+
+        if name == "05_medium_length_single_protagonist":
+            if not isinstance(outline, list) or len(outline) != 5:
+                issues.append("Phase B 05 expected outline with exactly 5 chapters")
+            for marker in ["小帅", "小美", "项目评估报告", "缺失封面", "高风险，不建议上线"]:
+                if marker not in codex_text:
+                    issues.append(f"Phase B 05 Codex missing marker: {marker}")
+            if "第五章" not in codex_text and "chapter 5" not in codex_text.lower():
+                issues.append("Phase B 05 Codex does not mark missing-cover warning as chapter-5 protected future information")
+            require_text("Phase B 05 chapter 1", chapter_text(1), [["项目评估报告", "报告"], ["缺失封面", "封面"]])
+            require_text("Phase B 05 chapter 2", chapter_text(2), [["涂黑"], ["三处", "3处", "三个"]])
+            require_text("Phase B 05 chapter 3", chapter_text(3), [["小美"], ["暂停", "停止", "暂缓", "叫停"]])
+            require_text("Phase B 05 chapter 4", chapter_text(4), [["小帅"], ["批准", "签批", "同意继续", "继续推进"]])
+            require_text("Phase B 05 chapter 5", chapter_text(5), [["高风险，不建议上线"], ["责任", "回避", "承担", "面对"]])
+            early = "\n".join(chapter_text(cid) for cid in range(1, 5))
+            if "高风险，不建议上线" in early:
+                issues.append("Phase B 05 missing-cover warning appears before chapter 5")
+            if any(token in final_text for token in ["小美走进旧办公室", "小美站在旧办公室", "小美坐在旧办公室"]):
+                issues.append("Phase B 05 risks turning 小美 into a present-time co-protagonist")
+
+        if name == "06_supporting_cast_codex_routing":
+            expected_roles = {
+                "小帅": ["唯一", "现实视角", "主角"],
+                "小美": ["风险", "定时系统", "匿名邮件"],
+                "阿强": ["数据清洗"],
+                "老周": ["直属领导", "录音"],
+                "林姐": ["善后"],
+                "匿名邮件": ["邮件"],
+                "灰度实验": ["灰度实验"],
+            }
+            for marker, role_tokens in expected_roles.items():
+                if marker not in codex_text:
+                    issues.append(f"Phase B 06 Codex missing marker: {marker}")
+                elif not any(token in codex_text for token in role_tokens):
+                    issues.append(f"Phase B 06 Codex role for {marker} is not distinct enough")
+            require_text("Phase B 06 chapter 2", chapter_text(2), [["阿强"], ["林姐"], ["数据异常", "异常"]])
+            require_text("Phase B 06 chapter 3", chapter_text(3), [["老周"], ["录音"], ["知道风险", "知情"]])
+            require_text("Phase B 06 chapter 4", chapter_text(4), [["小美"], ["定时系统", "定时"], ["匿名邮件"]])
+            for drift in ["阿强发来匿名邮件", "老周发来匿名邮件", "林姐发来匿名邮件"]:
+                if drift in final_text:
+                    issues.append(f"Phase B 06 character role drift: {drift}")
+            if any(token in final_text for token in ["警方", "刑警", "侦查", "审讯"]):
+                issues.append("Phase B 06 drifted into police investigation")
+
+        if name == "07_dual_timeline_continuity":
+            require_text("Phase B 07 chapter 1", chapter_text(1), [["旧会议室"], ["第一段录像", "第一段"], ["改方案", "方案"]])
+            require_text("Phase B 07 chapter 2", chapter_text(2), [["第二段录像", "第二段"], ["小美"], ["反对", "不同意"]])
+            require_text("Phase B 07 chapter 3", chapter_text(3), [["第三段录像", "第三段"], ["删掉了风险提示", "删掉风险提示", "删除风险提示", "删风险提示"]])
+            require_text("Phase B 07 chapter 4", chapter_text(4), [["第四段录像", "第四段"], ["小美"], ["承担责任", "担责"], ["离职", "离开"]])
+            early = "\n".join(chapter_text(cid) for cid in [1, 2])
+            if any(token in early for token in ["删掉了风险提示", "删掉风险提示", "删除风险提示", "删风险提示"]):
+                issues.append("Phase B 07 risk-warning deletion is revealed before chapter 3")
+            for cid in range(1, 5):
+                summary_after = chapter_text(cid, "03_summary_after.md")
+                for marker in ["现在时间线", "过去揭示", "尚未知"]:
+                    if marker not in summary_after:
+                        issues.append(f"Phase B 07 chapter {cid} summary_after missing dual-timeline marker: {marker}")
+                beats_text = chapter_text(cid, "01_beats.json")
+                if "现在" not in beats_text or not any(token in beats_text for token in ["录像", "三年前", "过去"]):
+                    issues.append(f"Phase B 07 chapter {cid} beats do not identify present action and past/video content")
+            if "小美心想" in final_text or "小美觉得" in final_text:
+                issues.append("Phase B 07 switches into 小美 internal POV")
         return issues
 
     def validate_beats_for_report(self, chapter_id: int, summary: str, beats: list[dict[str, Any]]) -> list[str]:

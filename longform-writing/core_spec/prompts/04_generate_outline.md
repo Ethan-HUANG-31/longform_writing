@@ -20,6 +20,9 @@ JSON array matching `outline.schema.json`.
 - Each summary must be concrete enough to generate beats.
 - Include `required_codex` when useful.
 - Protect delayed reveals.
+- If the request assigns chapter-by-chapter reveal timing, preserve that exact timing.
+- Keep one requested protagonist as the only protagonist and present-time viewpoint; supporting characters can provide evidence without becoming POV characters.
+- For dual timelines, each chapter summary should distinguish present-time action from past information revealed in that chapter.
 
 ## Prompt Template
 
@@ -51,4 +54,3 @@ Generate {{target_chapters}} chapters:
 - Abstract chapter summaries.
 - Reveals final twist too early.
 - Omits protagonist or central conflict.
-

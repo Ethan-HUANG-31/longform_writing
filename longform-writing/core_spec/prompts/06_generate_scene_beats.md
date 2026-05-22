@@ -24,6 +24,9 @@ JSON array matching `scene_beats.schema.json`.
 - Do not deviate from the chapter summary.
 - Do not continue the story beyond the summary.
 - Include `required_codex` when useful. Prefer stable Codex IDs. If IDs are unknown, use exact Codex names.
+- When a beat uses a supporting character or that character's evidence, include that character in `required_codex`.
+- For dual-timeline stories, every beat should make clear whether the action is present-time action, past video/document content, or the protagonist's current realization.
+- Keep future protected reveals in `must_not_reveal` until their assigned chapter.
 
 ## Prompt Template
 
@@ -56,7 +59,8 @@ Generate {{beat_count}} beats:
     "purpose": "",
     "required_codex": [],
     "reveals": [],
-    "must_not_reveal": []
+    "must_not_reveal": [],
+    "timeline": "present_action | past_evidence | current_realization"
   }
 ]
 

@@ -22,6 +22,8 @@ Markdown running text summary.
 - Mention characters by name.
 - Avoid pronouns when names are clearer.
 - Preserve key events, decisions, reveals, timeline facts, location changes, and state changes.
+- For dual-timeline chapters, include three compact labeled clauses in running text: `现在时间线：... 过去揭示：... 尚未知：...`.
+- Distinguish what happened in the past from when the protagonist learned it.
 - Omit sensory detail and mundane action unless plot-relevant.
 - Do not critique.
 

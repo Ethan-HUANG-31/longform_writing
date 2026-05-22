@@ -18,6 +18,8 @@ Markdown project brief.
 - Be concrete and concise.
 - Preserve forbidden elements.
 - State default assumptions.
+- Preserve explicit chapter count, single-protagonist/limited-POV rules, supporting-character roles, and delayed reveal timing.
+- For any reveal assigned to a later chapter, state both the allowed reveal chapter and what earlier chapters must not say.
 - Do not write story prose.
 
 ## Prompt Template
@@ -57,4 +59,3 @@ Write `01_project_brief.md` with sections:
 - Brief contradicts the request.
 - Brief introduces multiple protagonists in V0.
 - Brief omits hard constraints.
-
