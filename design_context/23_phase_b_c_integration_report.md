@@ -106,3 +106,49 @@ Evaluator rule:
 - Baseline judging is currently deterministic and heuristic. It is useful for regression pressure, but not yet a full literary-quality judge.
 - The full skill passes structural/process checks; prose quality should still be evaluated by a separate LLM judge rubric in the next revision loop.
 - The current genre adapter set is small: romance, fantasy, mystery/clue fairness, locked-room moral trial, and general fiction.
+
+## Next Phase Note: Chapter Review Quality Comparison
+
+When adding the chapter review / revision loop, include a quality comparison track in the same phase.
+
+Reason:
+
+- If `direct write` or `simple engineered` can consistently match the full skill on final prose quality, the full workflow must either justify its complexity through better control/revision or be simplified.
+- Current baseline controls mainly prove process advantages: continuity, reveal control, clue/Codex grounding, and traceability.
+- They do not yet prove that full-skill prose is better than simpler baselines.
+
+Required addition for the chapter review phase:
+
+```text
+For the same testcase, compare:
+1. direct-write manuscript
+2. simple-engineered manuscript
+3. full-skill manuscript before chapter review
+4. full-skill manuscript after chapter review/revision
+```
+
+Use a shared LLM judge rubric for text quality:
+
+- Story Foundation
+- Narrative Arc
+- Structural Progression
+- Pacing
+- Characterization
+- Dialogue
+- POV Control
+- Genre Fulfillment
+- Reader Engagement
+
+The judge must output scores with evidence, not general praise.
+
+The phase should report two separate conclusions:
+
+```text
+Process-control conclusion:
+Does the full skill improve continuity, reveal control, clue state, Codex grounding, and traceability?
+
+Text-quality conclusion:
+Does chapter review actually improve the final manuscript compared with direct/simple baselines?
+```
+
+If the simple baselines match or beat the reviewed full-skill manuscript on quality, record the gap as a Writer Rule or Workflow Simplification signal rather than defending the complex workflow by default.
