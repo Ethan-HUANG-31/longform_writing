@@ -53,6 +53,7 @@ Read these files as needed:
 - `core_spec/runtime_contract.yaml` for read/write contracts.
 - `core_spec/prompts/` for prompt templates.
 - `core_spec/schemas/` for JSON output schemas.
+- `references/quality_rubric_v1.md` for the fixed chapter-review value system when evaluating prose quality.
 
 Use `scripts/run_acceptance.py` to run a test case with trace records. It supports DeepSeek through `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
 
@@ -66,4 +67,3 @@ A run passes V0 only if:
 - rendered prompts and `step_manifest.jsonl` exist
 - final manuscript is assembled from chapter drafts
 - milestone-review runs record checkpoints and feedback application
-

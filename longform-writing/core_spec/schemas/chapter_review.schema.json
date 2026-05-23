@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChapterReviewV1",
+  "type": "object",
+  "required": [
+    "rubric_version",
+    "target",
+    "scores",
+    "overall",
+    "blocking_issues",
+    "calibration_notes"
+  ],
+  "properties": {
+    "rubric_version": {
+      "type": "string",
+      "const": "quality_rubric_v1"
+    },
+    "target": {
+      "type": "object",
+      "required": ["case_name", "method", "unit", "genre_adapter"],
+      "properties": {
+        "case_name": { "type": "string" },
+        "method": { "type": "string" },
+        "unit": { "type": "string" },
+        "genre_adapter": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "scores": {
+      "type": "object",
+      "required": ["literary_quality", "workflow_control"],
+      "properties": {
+        "literary_quality": {
+          "type": "object",
+          "required": [
+            "story_foundation",
+            "narrative_arc",
+            "structural_progression",
+            "pacing",
+            "characterization",
+            "dialogue",
+            "pov_narrative_distance",
+            "genre_fulfillment"
+          ],
+          "additionalProperties": { "$ref": "#/$defs/dimension_score" }
+        },
+        "workflow_control": {
+          "type": "object",
+          "required": [
+            "beat_fidelity",
+            "continuity",
+            "reveal_control",
+            "codex_grounding",
+            "revision_safety"
+          ],
+          "additionalProperties": { "$ref": "#/$defs/dimension_score" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "overall": {
+      "type": "object",
+      "required": [
+        "literary_score",
+        "control_score",
+        "weighted_score",
+        "revision_required",
+        "summary"
+      ],
+      "properties": {
+        "literary_score": { "type": "number", "minimum": 1, "maximum": 5 },
+        "control_score": { "type": "number", "minimum": 1, "maximum": 5 },
+        "weighted_score": { "type": "number", "minimum": 1, "maximum": 5 },
+        "revision_required": { "type": "boolean" },
+        "summary": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "blocking_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dimension", "location", "issue", "evidence", "suggested_fix"],
+        "properties": {
+          "dimension": { "type": "string" },
+          "location": { "type": "string" },
+          "issue": { "type": "string" },
+          "evidence": { "type": "string" },
+          "suggested_fix": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "calibration_notes": {
+      "type": "object",
+      "required": [
+        "distinguishes_method_quality",
+        "possible_false_positive",
+        "possible_false_negative"
+      ],
+      "properties": {
+        "distinguishes_method_quality": { "type": "boolean" },
+        "possible_false_positive": { "type": "string" },
+        "possible_false_negative": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "dimension_score": {
+      "type": "object",
+      "required": ["score", "evidence", "issue", "revision_target", "blocking"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "issue": { "type": "string" },
+        "revision_target": { "type": "string" },
+        "blocking": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
