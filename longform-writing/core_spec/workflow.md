@@ -37,3 +37,39 @@ Pause at:
 
 Apply feedback upstream, invalidate downstream outputs, and resume.
 
+## Workflow V1: Chapter Revision Loop
+
+V1 starts from the V0 full-skill manuscript and revises chapter by chapter before final assembly.
+
+For each chapter:
+
+1. `review_chapter_quality`
+   - Review the current chapter draft against the fixed quality rubric and continuity context.
+
+2. `plan_chapter_revision`
+   - Produce a focused revision plan for real prose improvement while preserving story facts.
+
+3. `rewrite_chapter`
+   - Rewrite the chapter from the plan, using Codex, outline, chapter context, and prior summaries.
+
+4. `summarize_revised_chapter`
+   - Summarize the revised chapter for downstream continuity.
+
+After all chapters:
+
+1. `merge_revised_manuscript`
+   - Assemble the revised chapter drafts into the revised full manuscript.
+
+2. Build the four-way blind package:
+   - `direct_write`
+   - simple engineered
+   - full skill unrevised
+   - full skill revised (`full_revised`)
+
+3. Evaluate the blind package with:
+   - Rubric Judge
+   - Reader/Editor Judge
+
+4. Iterate the chapter revision loop up to 3 times.
+
+Success requires `full_revised` to beat `direct_write` in blind real-text quality while preserving longform continuity.

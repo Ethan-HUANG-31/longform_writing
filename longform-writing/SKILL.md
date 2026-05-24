@@ -57,6 +57,16 @@ Read these files as needed:
 
 Use `scripts/run_acceptance.py` to run a test case with trace records. It supports DeepSeek through `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
 
+## V1 Chapter Revision Mode
+
+Use the V1 revision loop to compare direct write, simple engineered, full skill unrevised, and full skill revised outputs:
+
+```bash
+python3 longform-writing/scripts/run_v1_revision_loop.py --cases 05_medium_length_single_protagonist 10_mystery_clue_fairness_smoke 07_dual_timeline_continuity --max-iterations 3
+```
+
+The V1 goal is real-text blind quality, not workflow traceability.
+
 ## Acceptance Standard
 
 A run passes V0 only if:
