@@ -6,6 +6,7 @@ runs/
 baseline_runs/
 quality_calibration_runs/
 blind_quality_eval_runs/
+revision_eval_runs/
 GPT对话记录/
 node_modules/
 dist/

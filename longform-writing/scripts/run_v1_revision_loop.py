@@ -136,6 +136,31 @@ def build_blind_package(output_root: Path, cases: dict[str, dict[str, Any]]) -> 
     return mapping
 
 
+def decide_acceptance(case_id: str, iteration_id: int, judge_rankings: dict[str, list[str]]) -> dict[str, Any]:
+    failures: list[str] = []
+    for judge, ranking in judge_rankings.items():
+        if "full_revised" not in ranking or "direct_write" not in ranking or "full_unrevised" not in ranking:
+            failures.append(f"{judge} ranking missing required method.")
+            continue
+        if ranking.index("full_revised") > ranking.index("direct_write"):
+            failures.append(f"{judge}: direct_write beats full_revised.")
+        if ranking.index("full_revised") > ranking.index("full_unrevised"):
+            failures.append(f"{judge}: full_unrevised beats full_revised.")
+    return {
+        "case_id": case_id,
+        "iteration_id": iteration_id,
+        "judge_rankings": judge_rankings,
+        "revealed_ranking": judge_rankings.get("reader") or judge_rankings.get("rubric") or [],
+        "pass": not failures,
+        "evidence": [],
+        "failure_reason": "; ".join(failures),
+        "next_iteration_strategy": [
+            "Reduce repetition and checklist prose.",
+            "Increase character pressure and scene flow.",
+        ] if failures else [],
+    }
+
+
 def collect_previous_summaries(run_dir: Path, chapter_id: int) -> str:
     chunks: list[str] = []
     for cid in range(1, chapter_id):
@@ -384,6 +409,23 @@ def main() -> int:
                 iteration,
             )
             runner.revise_all_chapters()
+        blind_cases: dict[str, dict[str, Any]] = {}
+        for case in args.cases:
+            test_case_path = args.test_dir / f"{case}.md"
+            request = parse_test_case(test_case_path)["request"]
+            run_dir = ROOT / "runs" / f"{case}_v1_revision_iter_{iteration:02d}"
+            blind_cases[f"case_{case[:2]}"] = {
+                "case_name": case,
+                "request": request,
+                "methods": {
+                    "direct_write": ROOT / "baseline_runs" / "direct_write" / case / "manuscript.md",
+                    "simple_engineered": ROOT / "baseline_runs" / "simple_engineered" / case / "manuscript.md",
+                    "full_unrevised": run_dir / "manuscript" / "final_unrevised.md",
+                    "full_revised": run_dir / "manuscript" / "final_revised.md",
+                },
+            }
+        mapping = build_blind_package(iter_root / "blind", blind_cases)
+        write_text(iter_root / "private_mapping.json", json.dumps(mapping, ensure_ascii=False, indent=2) + "\n")
         print(f"iteration {iteration:02d} complete")
         break
     return 0

@@ -193,6 +193,28 @@ class V1RevisionHelperTests(unittest.TestCase):
                 module.build_blind_package(fake_repo_root, {})
 
 
+class V1AcceptanceDecisionTests(unittest.TestCase):
+    def test_acceptance_passes_when_full_revised_beats_direct_and_unrevised(self) -> None:
+        module = load_v1_runner()
+        rankings = {
+            "rubric": ["full_revised", "direct_write", "full_unrevised", "simple_engineered"],
+            "reader": ["full_revised", "direct_write", "simple_engineered", "full_unrevised"],
+        }
+        result = module.decide_acceptance("case_05", 1, rankings)
+        self.assertTrue(result["pass"])
+        self.assertEqual(result["failure_reason"], "")
+
+    def test_acceptance_fails_when_direct_beats_full_revised(self) -> None:
+        module = load_v1_runner()
+        rankings = {
+            "rubric": ["direct_write", "full_revised", "full_unrevised", "simple_engineered"],
+            "reader": ["direct_write", "full_revised", "simple_engineered", "full_unrevised"],
+        }
+        result = module.decide_acceptance("case_10", 1, rankings)
+        self.assertFalse(result["pass"])
+        self.assertIn("direct_write", result["failure_reason"])
+
+
 class V1RevisionPromptValueTests(unittest.TestCase):
     def test_collect_previous_summaries_uses_revised_when_available(self) -> None:
         module = load_v1_runner()
