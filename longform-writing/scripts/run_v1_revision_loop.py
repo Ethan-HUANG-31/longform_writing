@@ -22,7 +22,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from run_acceptance import AcceptanceRun, load_dotenv, parse_test_case, read_text, write_text  # noqa: E402
+from run_acceptance import AcceptanceRun, load_dotenv, parse_test_case, read_text, render_template, write_text  # noqa: E402
 
 
 DEFAULT_CASES = [
@@ -171,6 +171,21 @@ def builtin_chapter_review(chapter_id: int, chapter_text: str) -> dict[str, Any]
     }
 
 
+def apply_builtin_revision(text: str) -> str:
+    revised: list[str] = []
+    seen: set[str] = set()
+    for paragraph in re.split(r"\n\s*\n", text):
+        stripped = paragraph.strip()
+        if not stripped:
+            continue
+        key = re.sub(r"\s+", "", stripped)
+        if key in seen:
+            continue
+        seen.add(key)
+        revised.append(stripped)
+    return "\n\n".join(revised).strip() + "\n"
+
+
 class V1RevisionRun:
     def __init__(
         self,
@@ -252,6 +267,99 @@ class V1RevisionRun:
         )
         return plan
 
+    def rewrite_chapter(self, chapter_id: int, revision_plan: dict[str, Any]) -> str:
+        chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"
+        original = read_text(chapter_dir / "02_draft.md")
+        must_fix = revision_plan.get("must_fix", [])
+        if not must_fix:
+            revised = original
+            notes = "No blocking revision items; original chapter preserved.\n"
+        else:
+            chapter_summary = self.acceptance.read_project(f"chapters/chapter_{chapter_id:02d}/00_summary.md")
+            _, relevant_codex = self.acceptance.select_codex(original + "\n\n" + chapter_summary)
+            rendered = render_template(
+                self.template("14_rewrite_chapter.md"),
+                {
+                    "project_brief": self.acceptance.read_project("01_project_brief.md"),
+                    "previous_summaries": collect_previous_summaries(self.run_dir, chapter_id),
+                    "chapter_summary": chapter_summary,
+                    "relevant_codex": relevant_codex,
+                    "original_chapter_text": original,
+                    "revision_plan": revision_plan,
+                },
+            )
+            model_revised = self.acceptance.client.complete(rendered, max_tokens=4200, temperature=0.25).strip()
+            if not model_revised or model_revised == "MOCK_OUTPUT":
+                revised = apply_builtin_revision(original)
+                notes = "Used builtin duplicate-paragraph fallback because model rewrite was empty or MOCK_OUTPUT.\n"
+            else:
+                revised = model_revised.strip() + "\n"
+                notes = "Used model rewrite from 14_rewrite_chapter.md.\n"
+            self.acceptance.record(
+                "rewrite_chapter",
+                "core_spec/prompts/14_rewrite_chapter.md",
+                rendered,
+                [
+                    "01_project_brief.md",
+                    "02_codex.json",
+                    f"chapters/chapter_{chapter_id:02d}/00_summary.md",
+                    f"chapters/chapter_{chapter_id:02d}/02_draft.md",
+                    f"chapters/chapter_{chapter_id:02d}/05_revision_plan.json",
+                ],
+                [
+                    f"chapters/chapter_{chapter_id:02d}/02_revised_draft.md",
+                    f"chapters/chapter_{chapter_id:02d}/06_revision_notes.md",
+                ],
+                "success",
+                ["Project Brief", "Previous Summaries", "Chapter Summary", "Relevant Codex", "Revision Plan"],
+            )
+        write_text(chapter_dir / "02_revised_draft.md", revised.strip() + "\n")
+        write_text(chapter_dir / "06_revision_notes.md", notes)
+        return revised
+
+    def summarize_revised_chapter(self, chapter_id: int, revised_chapter_text: str) -> str:
+        chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"
+        rendered = render_template(
+            self.template("15_summarize_revised_chapter.md"),
+            {
+                "project_brief": self.acceptance.read_project("01_project_brief.md"),
+                "revised_chapter_text": revised_chapter_text,
+            },
+        )
+        model_summary = self.acceptance.client.complete(rendered, max_tokens=900, temperature=0.1).strip()
+        if not model_summary or model_summary == "MOCK_OUTPUT":
+            summary = self.acceptance.read_project(f"chapters/chapter_{chapter_id:02d}/03_summary_after.md").strip()
+        else:
+            summary = model_summary
+        self.acceptance.record(
+            "summarize_revised_chapter",
+            "core_spec/prompts/15_summarize_revised_chapter.md",
+            rendered,
+            ["01_project_brief.md", f"chapters/chapter_{chapter_id:02d}/02_revised_draft.md"],
+            [f"chapters/chapter_{chapter_id:02d}/03_summary_after_revised.md"],
+            "success",
+            ["Project Brief", "Revised Chapter Text"],
+        )
+        write_text(chapter_dir / "03_summary_after_revised.md", summary.strip() + "\n")
+        return summary.strip() + "\n"
+
+    def revise_all_chapters(self) -> str:
+        self.ensure_unrevised_draft()
+        for chapter_dir in sorted((self.run_dir / "chapters").glob("chapter_*")):
+            match = re.search(r"chapter_(\d+)$", chapter_dir.name)
+            if not match:
+                continue
+            chapter_id = int(match.group(1))
+            review = self.review_chapter(chapter_id)
+            plan = self.plan_revision(chapter_id, review)
+            revised = self.rewrite_chapter(chapter_id, plan)
+            self.summarize_revised_chapter(chapter_id, revised)
+        final = self.run_dir / "manuscript" / "final.md"
+        final_unrevised = self.run_dir / "manuscript" / "final_unrevised.md"
+        if final.exists() and not final_unrevised.exists():
+            write_text(final_unrevised, final.read_text(encoding="utf-8"))
+        return merge_revised_chapters(self.run_dir)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -264,9 +372,20 @@ def main() -> int:
     args = parser.parse_args()
 
     load_dotenv(ROOT / ".env")
-    print("V1 runner helper layer is installed.")
-    print(f"cases={','.join(args.cases)}")
-    print(f"max_iterations={args.max_iterations}")
+    for iteration in range(1, args.max_iterations + 1):
+        iter_root = args.output_root / f"iteration_{iteration:02d}"
+        iter_root.mkdir(parents=True, exist_ok=True)
+        for case in args.cases:
+            runner = V1RevisionRun(
+                args.skill_path,
+                args.test_dir / f"{case}.md",
+                ROOT / "runs" / f"{case}_v1_revision_iter_{iteration:02d}",
+                args.provider,
+                iteration,
+            )
+            runner.revise_all_chapters()
+        print(f"iteration {iteration:02d} complete")
+        break
     return 0
 
 

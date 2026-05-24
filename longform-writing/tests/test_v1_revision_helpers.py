@@ -244,5 +244,15 @@ class V1RevisionPromptValueTests(unittest.TestCase):
             )
 
 
+class V1RevisionRewriteFallbackTests(unittest.TestCase):
+    def test_apply_builtin_revision_removes_duplicate_paragraphs(self) -> None:
+        module = load_v1_runner()
+        text = "第一段。\n\n重复段落很长很长很长。\n\n重复段落很长很长很长。\n\n结尾。"
+        revised = module.apply_builtin_revision(text)
+        self.assertEqual(revised.count("重复段落很长很长很长。"), 1)
+        self.assertTrue(revised.startswith("第一段。"))
+        self.assertTrue(revised.strip().endswith("结尾。"))
+
+
 if __name__ == "__main__":
     unittest.main()
