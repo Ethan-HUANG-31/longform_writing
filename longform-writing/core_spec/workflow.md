@@ -45,20 +45,25 @@ For each chapter:
 
 1. `review_chapter_quality`
    - Review the current chapter draft against the fixed quality rubric and continuity context.
+   - Output `chapters/chapter_XX/04_chapter_review.json` and `chapters/chapter_XX/04_chapter_review.md`.
 
 2. `plan_chapter_revision`
    - Produce a focused revision plan for real prose improvement while preserving story facts.
+   - Output `chapters/chapter_XX/05_revision_plan.json` and `chapters/chapter_XX/05_revision_plan.md`.
 
 3. `rewrite_chapter`
    - Rewrite the chapter from the plan, using Codex, outline, chapter context, and prior summaries.
+   - Output `chapters/chapter_XX/02_revised_draft.md`.
 
 4. `summarize_revised_chapter`
    - Summarize the revised chapter for downstream continuity.
+   - Output `chapters/chapter_XX/03_summary_after_revised.md`.
 
 After all chapters:
 
 1. `merge_revised_manuscript`
    - Assemble the revised chapter drafts into the revised full manuscript.
+   - Preserve `manuscript/final_unrevised.md` and output `manuscript/final_revised.md`.
 
 2. Build the four-way blind package:
    - `direct_write`
