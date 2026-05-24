@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChapterRevisionPlanV1",
+  "type": "object",
+  "required": [
+    "chapter_id",
+    "must_fix",
+    "preserve",
+    "rewrite_strategy",
+    "continuity_constraints",
+    "expected_quality_gains",
+    "risk_notes"
+  ],
+  "properties": {
+    "chapter_id": { "type": "integer", "minimum": 1 },
+    "must_fix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue", "evidence", "rewrite_instruction"],
+        "properties": {
+          "issue": { "type": "string" },
+          "evidence": { "type": "string" },
+          "rewrite_instruction": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "preserve": { "type": "array", "items": { "type": "string" } },
+    "rewrite_strategy": { "type": "array", "items": { "type": "string" } },
+    "continuity_constraints": { "type": "array", "items": { "type": "string" } },
+    "expected_quality_gains": { "type": "array", "items": { "type": "string" } },
+    "risk_notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

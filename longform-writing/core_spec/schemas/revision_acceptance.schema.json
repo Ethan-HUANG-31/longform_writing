@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RevisionAcceptanceV1",
+  "type": "object",
+  "required": [
+    "case_id",
+    "iteration_id",
+    "judge_rankings",
+    "revealed_ranking",
+    "pass",
+    "evidence",
+    "failure_reason"
+  ],
+  "properties": {
+    "case_id": { "type": "string" },
+    "iteration_id": { "type": "integer", "minimum": 1 },
+    "judge_rankings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "revealed_ranking": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "pass": { "type": "boolean" },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "failure_reason": { "type": "string" },
+    "next_iteration_strategy": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}
