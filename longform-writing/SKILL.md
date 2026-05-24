@@ -65,7 +65,7 @@ Use the V1 revision loop to compare direct write, simple engineered, full skill 
 python3 longform-writing/scripts/run_v1_revision_loop.py --cases 05_medium_length_single_protagonist 10_mystery_clue_fairness_smoke 07_dual_timeline_continuity --max-iterations 3
 ```
 
-The V1 goal is real-text blind quality, not workflow traceability.
+The V1 goal is real-text blind quality, not workflow traceability. `full_revised` must beat both `direct_write` and `full_unrevised` in the required blind rankings.
 
 ## Acceptance Standard
 

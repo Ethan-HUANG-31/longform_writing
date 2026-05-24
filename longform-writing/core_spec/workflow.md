@@ -77,4 +77,4 @@ After all chapters:
 
 4. Iterate the chapter revision loop up to 3 times.
 
-Success requires `full_revised` to beat `direct_write` in blind real-text quality while preserving longform continuity.
+Success requires `full_revised` to beat both `direct_write` and `full_unrevised` in the required blind real-text quality rankings while preserving longform continuity.
