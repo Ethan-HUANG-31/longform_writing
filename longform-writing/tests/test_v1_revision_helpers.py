@@ -200,15 +200,23 @@ class V1RevisionPromptValueTests(unittest.TestCase):
             run_dir = Path(tmp)
             c1 = run_dir / "chapters" / "chapter_01"
             c2 = run_dir / "chapters" / "chapter_02"
+            c3 = run_dir / "chapters" / "chapter_03"
+            c4 = run_dir / "chapters" / "chapter_04"
             c1.mkdir(parents=True)
             c2.mkdir(parents=True)
+            c3.mkdir(parents=True)
+            c4.mkdir(parents=True)
             (c1 / "03_summary_after.md").write_text("old summary\n", encoding="utf-8")
             (c1 / "03_summary_after_revised.md").write_text("revised summary\n", encoding="utf-8")
             (c2 / "03_summary_after.md").write_text("chapter two\n", encoding="utf-8")
+            (c3 / "03_summary_after.md").write_text("current chapter\n", encoding="utf-8")
+            (c4 / "03_summary_after.md").write_text("future chapter\n", encoding="utf-8")
             result = module.collect_previous_summaries(run_dir, 3)
             self.assertIn("revised summary", result)
             self.assertIn("chapter two", result)
             self.assertNotIn("old summary", result)
+            self.assertNotIn("current chapter", result)
+            self.assertNotIn("future chapter", result)
 
     def test_builtin_review_injects_repetition_findings(self) -> None:
         module = load_v1_runner()
