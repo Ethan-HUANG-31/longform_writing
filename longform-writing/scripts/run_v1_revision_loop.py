@@ -37,6 +37,14 @@ SAMPLE_IDS = ["A", "B", "C", "D"]
 REQUIRED_JUDGES = ["rubric", "reader"]
 
 
+def require_external_model_export_approval(provider: str, allowed: bool) -> None:
+    if provider == "deepseek" and not allowed:
+        raise RuntimeError(
+            "DeepSeek sends local test cases, context, and manuscripts to an external API. "
+            "Re-run with --allow-external-model-export after explicit approval."
+        )
+
+
 def find_repetition_signals(text: str) -> list[dict[str, str]]:
     patterns = [
         "举到灯光下",
@@ -411,7 +419,13 @@ def main() -> int:
     parser.add_argument("--provider", choices=["deepseek"], default="deepseek")
     parser.add_argument("--cases", nargs="*", default=DEFAULT_CASES)
     parser.add_argument("--max-iterations", type=int, default=3)
+    parser.add_argument("--allow-external-model-export", action="store_true")
     args = parser.parse_args()
+
+    try:
+        require_external_model_export_approval(args.provider, args.allow_external_model_export)
+    except RuntimeError as exc:
+        parser.error(str(exc))
 
     load_dotenv(ROOT / ".env")
     for iteration in range(1, args.max_iterations + 1):

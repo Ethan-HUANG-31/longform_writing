@@ -62,8 +62,10 @@ Use `scripts/run_acceptance.py` to run a test case with trace records. It suppor
 Use the V1 revision loop to compare direct write, simple engineered, full skill unrevised, and full skill revised outputs:
 
 ```bash
-python3 longform-writing/scripts/run_v1_revision_loop.py --cases 05_medium_length_single_protagonist 10_mystery_clue_fairness_smoke 07_dual_timeline_continuity --max-iterations 3
+python3 longform-writing/scripts/run_v1_revision_loop.py --allow-external-model-export --cases 05_medium_length_single_protagonist 10_mystery_clue_fairness_smoke 07_dual_timeline_continuity --max-iterations 3
 ```
+
+`--allow-external-model-export` is required because the DeepSeek V1 path sends local test cases, context, and manuscripts to an external API.
 
 The V1 goal is real-text blind quality, not workflow traceability. `full_revised` must beat both `direct_write` and `full_unrevised` in the required blind rankings.
 

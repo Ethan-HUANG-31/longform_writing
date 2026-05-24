@@ -87,6 +87,19 @@ def load_v1_runner():
 
 
 class V1RevisionHelperTests(unittest.TestCase):
+    def test_require_external_model_export_approval_rejects_deepseek_without_flag(self) -> None:
+        module = load_v1_runner()
+
+        with self.assertRaises(RuntimeError) as ctx:
+            module.require_external_model_export_approval("deepseek", False)
+
+        self.assertIn("--allow-external-model-export", str(ctx.exception))
+
+    def test_require_external_model_export_approval_accepts_deepseek_with_flag(self) -> None:
+        module = load_v1_runner()
+
+        module.require_external_model_export_approval("deepseek", True)
+
     def test_find_repetition_signals_detects_repeated_object_handling(self) -> None:
         module = load_v1_runner()
         text = "小帅将报告举到灯光下。\n他放下报告。\n小帅将报告举到灯光下。"

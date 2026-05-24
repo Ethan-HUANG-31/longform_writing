@@ -28,6 +28,7 @@ Command attempted:
 ```bash
 python3 longform-writing/scripts/run_v1_revision_loop.py \
   --provider deepseek \
+  --allow-external-model-export \
   --cases 05_medium_length_single_protagonist 10_mystery_clue_fairness_smoke 07_dual_timeline_continuity \
   --max-iterations 3
 ```
@@ -70,5 +71,7 @@ To continue the planned Task 7 path, the user must explicitly approve the DeepSe
 ```text
 我批准这轮把测试 case、生成上下文和稿件内容发送到 DeepSeek API 执行 V1 写作测试。
 ```
+
+After approval, rerun with `--allow-external-model-export`; the runner now aborts before dotenv loading or run artifact creation unless that flag is present for the DeepSeek external API path.
 
 If that approval is not given, the safer fallback is to use internal Codex agents to generate and evaluate the manuscripts. That can still test the revision concept and blind evaluation process, but it will not verify the actual DeepSeek-backed runner path.
