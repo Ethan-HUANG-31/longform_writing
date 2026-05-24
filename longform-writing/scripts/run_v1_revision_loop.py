@@ -81,7 +81,9 @@ def merge_revised_chapters(run_dir: Path) -> str:
         original = chapter_dir / "02_draft.md"
         chosen = revised if revised.exists() and revised.read_text(encoding="utf-8").strip() else original
         if not chosen.exists():
-            continue
+            raise FileNotFoundError(
+                f"{chapter_dir} has no source draft: expected 02_revised_draft.md or 02_draft.md"
+            )
         parts.append(chosen.read_text(encoding="utf-8").strip())
         manifest_rows.append({
             "chapter": chapter_dir.name,
@@ -95,9 +97,22 @@ def merge_revised_chapters(run_dir: Path) -> str:
     return manuscript
 
 
+def clean_blind_output_root(output_root: Path) -> None:
+    resolved_root = output_root.expanduser().resolve()
+    dangerous_roots = {Path(resolved_root.anchor), Path.home().resolve(), ROOT.resolve()}
+    if resolved_root in dangerous_roots:
+        raise ValueError(f"Refusing to clean dangerous blind output root: {resolved_root}")
+
+    for child_name in ("public", "private_mapping.json", "README.md"):
+        child = resolved_root / child_name
+        if child.is_dir():
+            shutil.rmtree(child)
+        elif child.exists():
+            child.unlink()
+
+
 def build_blind_package(output_root: Path, cases: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    if output_root.exists():
-        shutil.rmtree(output_root)
+    clean_blind_output_root(output_root)
     public = output_root / "public"
     mapping: dict[str, Any] = {}
     for case_id, case in cases.items():

@@ -110,6 +110,19 @@ class V1RevisionHelperTests(unittest.TestCase):
             self.assertNotIn("original one", result)
             self.assertTrue((run_dir / "manuscript" / "final_revised.md").exists())
 
+    def test_merge_revised_chapters_rejects_missing_chapter_source(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            chapter_1 = run_dir / "chapters" / "chapter_01"
+            chapter_2 = run_dir / "chapters" / "chapter_02"
+            chapter_1.mkdir(parents=True)
+            chapter_2.mkdir(parents=True)
+            (chapter_1 / "02_draft.md").write_text("original one\n", encoding="utf-8")
+
+            with self.assertRaises(FileNotFoundError):
+                module.merge_revised_chapters(run_dir)
+
     def test_build_blind_package_creates_private_mapping(self) -> None:
         module = load_v1_runner()
         with tempfile.TemporaryDirectory() as tmp:
@@ -135,6 +148,49 @@ class V1RevisionHelperTests(unittest.TestCase):
             self.assertTrue((out / "public" / "case_05" / "sample_A.md").exists())
             self.assertTrue((out / "private_mapping.json").exists())
             self.assertEqual(set(mapping["case_05"]["samples"].keys()), {"A", "B", "C", "D"})
+
+    def test_build_blind_package_preserves_unknown_output_children(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            case_dir = root / "case"
+            case_dir.mkdir()
+            paths = {}
+            for method in ["direct_write", "simple_engineered", "full_unrevised", "full_revised"]:
+                path = case_dir / f"{method}.md"
+                path.write_text(f"# {method}\n", encoding="utf-8")
+                paths[method] = path
+            out = root / "blind"
+            (out / "public" / "old_case").mkdir(parents=True)
+            (out / "private_mapping.json").write_text("{}\n", encoding="utf-8")
+            (out / "README.md").write_text("old readme\n", encoding="utf-8")
+            keep = out / "keep.txt"
+            keep.write_text("do not remove\n", encoding="utf-8")
+
+            module.build_blind_package(
+                out,
+                {
+                    "case_05": {
+                        "case_name": "05_medium_length_single_protagonist",
+                        "request": "写一个五章故事。",
+                        "methods": paths,
+                    }
+                },
+            )
+
+            self.assertTrue(keep.exists())
+            self.assertFalse((out / "public" / "old_case").exists())
+            self.assertTrue((out / "public" / "case_05" / "sample_A.md").exists())
+
+    def test_build_blind_package_rejects_repo_root_output(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_repo_root = Path(tmp) / "repo"
+            fake_repo_root.mkdir()
+            module.ROOT = fake_repo_root
+
+            with self.assertRaises(ValueError):
+                module.build_blind_package(fake_repo_root, {})
 
 
 if __name__ == "__main__":
