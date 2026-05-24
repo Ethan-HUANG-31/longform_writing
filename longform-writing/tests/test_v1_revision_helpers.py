@@ -193,5 +193,31 @@ class V1RevisionHelperTests(unittest.TestCase):
                 module.build_blind_package(fake_repo_root, {})
 
 
+class V1RevisionPromptValueTests(unittest.TestCase):
+    def test_collect_previous_summaries_uses_revised_when_available(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            c1 = run_dir / "chapters" / "chapter_01"
+            c2 = run_dir / "chapters" / "chapter_02"
+            c1.mkdir(parents=True)
+            c2.mkdir(parents=True)
+            (c1 / "03_summary_after.md").write_text("old summary\n", encoding="utf-8")
+            (c1 / "03_summary_after_revised.md").write_text("revised summary\n", encoding="utf-8")
+            (c2 / "03_summary_after.md").write_text("chapter two\n", encoding="utf-8")
+            result = module.collect_previous_summaries(run_dir, 3)
+            self.assertIn("revised summary", result)
+            self.assertIn("chapter two", result)
+            self.assertNotIn("old summary", result)
+
+    def test_builtin_review_injects_repetition_findings(self) -> None:
+        module = load_v1_runner()
+        text = "小帅将报告举到灯光下。\n\n小帅将报告举到灯光下。"
+        review = module.builtin_chapter_review(1, text)
+        self.assertTrue(review["revision_required"])
+        self.assertTrue(review["blocking_issues"])
+        self.assertEqual(review["blocking_issues"][0]["dimension"], "Scene & Prose Flow")
+
+
 if __name__ == "__main__":
     unittest.main()

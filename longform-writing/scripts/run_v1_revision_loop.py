@@ -22,7 +22,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from run_acceptance import load_dotenv, read_text, write_text  # noqa: E402
+from run_acceptance import AcceptanceRun, load_dotenv, parse_test_case, read_text, write_text  # noqa: E402
 
 
 DEFAULT_CASES = [
@@ -134,6 +134,120 @@ def build_blind_package(output_root: Path, cases: dict[str, dict[str, Any]]) -> 
         "# V1 Blind Revision Evaluation Package\n\nGive evaluators only `public/` until judging is complete.\n",
     )
     return mapping
+
+
+def collect_previous_summaries(run_dir: Path, chapter_id: int) -> str:
+    chunks: list[str] = []
+    for cid in range(1, chapter_id):
+        chapter_dir = run_dir / "chapters" / f"chapter_{cid:02d}"
+        revised = chapter_dir / "03_summary_after_revised.md"
+        original = chapter_dir / "03_summary_after.md"
+        chosen = revised if revised.exists() and revised.read_text(encoding="utf-8").strip() else original
+        if chosen.exists():
+            chunks.append(f"Chapter {cid} summary:\n{chosen.read_text(encoding='utf-8').strip()}")
+    return "\n\n".join(chunks)
+
+
+def builtin_chapter_review(chapter_id: int, chapter_text: str) -> dict[str, Any]:
+    issues = find_repetition_signals(chapter_text)
+    checklist_markers = ["**一、", "**二、", "**三、", "一、旧", "二、日期", "三、书号"]
+    if any(marker in chapter_text for marker in checklist_markers):
+        issues.append({
+            "dimension": "Scene & Prose Flow",
+            "location": f"chapter_{chapter_id:02d}",
+            "issue": "Deduction is presented as an explicit checklist.",
+            "evidence": " / ".join(marker for marker in checklist_markers if marker in chapter_text),
+            "suggested_fix": "Rewrite the deduction as scene movement, dialogue pressure, or incremental discovery.",
+        })
+    return {
+        "rubric_version": "longform_text_quality_rubric_v1",
+        "chapter_id": chapter_id,
+        "overall_score": 3.0 if issues else 4.0,
+        "revision_required": bool(issues),
+        "strengths_to_preserve": [],
+        "blocking_issues": issues,
+        "continuity_risks": [],
+        "revision_targets": [issue["suggested_fix"] for issue in issues],
+    }
+
+
+class V1RevisionRun:
+    def __init__(
+        self,
+        skill_path: Path,
+        test_case_path: Path,
+        run_dir: Path,
+        provider: str,
+        iteration_id: int,
+    ) -> None:
+        self.skill_path = skill_path.resolve()
+        self.test_case_path = test_case_path.resolve()
+        self.test_case = parse_test_case(self.test_case_path)
+        self.run_dir = run_dir.resolve()
+        self.provider = provider
+        self.iteration_id = iteration_id
+        self.acceptance = AcceptanceRun(
+            self.skill_path,
+            self.test_case,
+            self.run_dir,
+            provider,
+            "full_auto",
+            4,
+            260,
+        )
+
+    def template(self, filename: str) -> str:
+        return read_text(self.skill_path / "core_spec" / "prompts" / filename)
+
+    def ensure_unrevised_draft(self) -> None:
+        if (self.run_dir / "manuscript" / "final.md").exists():
+            return
+        self.acceptance.run()
+        final = self.run_dir / "manuscript" / "final.md"
+        if final.exists():
+            write_text(self.run_dir / "manuscript" / "final_unrevised.md", final.read_text(encoding="utf-8"))
+
+    def review_chapter(self, chapter_id: int) -> dict[str, Any]:
+        chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"
+        chapter_text = read_text(chapter_dir / "02_draft.md")
+        builtin = builtin_chapter_review(chapter_id, chapter_text)
+        write_text(chapter_dir / "04_chapter_review.json", json.dumps(builtin, ensure_ascii=False, indent=2) + "\n")
+        lines = ["# Chapter Review", "", f"Revision required: `{str(builtin['revision_required']).lower()}`", "", "## Blocking Issues"]
+        for issue in builtin["blocking_issues"]:
+            lines.append(f"- {issue['dimension']}: {issue['issue']} Evidence: {issue['evidence']}")
+        if not builtin["blocking_issues"]:
+            lines.append("- None")
+        write_text(chapter_dir / "04_chapter_review.md", "\n".join(lines) + "\n")
+        return builtin
+
+    def plan_revision(self, chapter_id: int, review: dict[str, Any]) -> dict[str, Any]:
+        plan = {
+            "chapter_id": chapter_id,
+            "must_fix": [
+                {
+                    "issue": issue["issue"],
+                    "evidence": issue["evidence"],
+                    "rewrite_instruction": issue["suggested_fix"],
+                }
+                for issue in review.get("blocking_issues", [])
+            ],
+            "preserve": ["Preserve required plot facts, reveal order, POV, and chapter function."],
+            "rewrite_strategy": [
+                "Compress repeated object handling.",
+                "Convert clue confirmation into character pressure.",
+                "Replace checklist deduction with scene or dialogue when possible.",
+            ],
+            "continuity_constraints": ["Do not add new major facts that contradict previous summaries."],
+            "expected_quality_gains": review.get("revision_targets", []),
+            "risk_notes": [],
+        }
+        chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"
+        write_text(chapter_dir / "05_revision_plan.json", json.dumps(plan, ensure_ascii=False, indent=2) + "\n")
+        write_text(
+            chapter_dir / "05_revision_plan.md",
+            "# Revision Plan\n\n```json\n" + json.dumps(plan, ensure_ascii=False, indent=2) + "\n```\n",
+        )
+        return plan
 
 
 def main() -> int:
