@@ -214,6 +214,32 @@ class V1AcceptanceDecisionTests(unittest.TestCase):
         self.assertFalse(result["pass"])
         self.assertIn("direct_write", result["failure_reason"])
 
+    def test_acceptance_fails_without_required_judges(self) -> None:
+        module = load_v1_runner()
+        result = module.decide_acceptance("case_05", 1, {})
+        self.assertFalse(result["pass"])
+        self.assertIn("rubric ranking missing", result["failure_reason"])
+        self.assertIn("reader ranking missing", result["failure_reason"])
+
+    def test_acceptance_rejects_invalid_rankings(self) -> None:
+        module = load_v1_runner()
+        rankings = {
+            "rubric": ["full_revised", "direct_write", "direct_write", "unknown_method"],
+            "reader": ["full_revised", "direct_write", "full_unrevised", "simple_engineered"],
+        }
+        result = module.decide_acceptance("case_05", 1, rankings)
+        self.assertFalse(result["pass"])
+        self.assertIn("unknown methods", result["failure_reason"])
+        self.assertIn("missing required methods", result["failure_reason"])
+        self.assertIn("duplicate methods", result["failure_reason"])
+
+    def test_iteration_root_uses_task_7_contract(self) -> None:
+        module = load_v1_runner()
+        self.assertEqual(
+            module.iteration_root(Path("revision_eval_runs/v1_chapter_revision"), 1),
+            Path("revision_eval_runs/v1_chapter_revision/iter_01"),
+        )
+
 
 class V1RevisionPromptValueTests(unittest.TestCase):
     def test_collect_previous_summaries_uses_revised_when_available(self) -> None:

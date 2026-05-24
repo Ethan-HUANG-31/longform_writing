@@ -34,6 +34,7 @@ DEFAULT_CASES = [
 
 METHOD_ORDER = ["direct_write", "simple_engineered", "full_unrevised", "full_revised"]
 SAMPLE_IDS = ["A", "B", "C", "D"]
+REQUIRED_JUDGES = ["rubric", "reader"]
 
 
 def find_repetition_signals(text: str) -> list[dict[str, str]]:
@@ -138,9 +139,21 @@ def build_blind_package(output_root: Path, cases: dict[str, dict[str, Any]]) -> 
 
 def decide_acceptance(case_id: str, iteration_id: int, judge_rankings: dict[str, list[str]]) -> dict[str, Any]:
     failures: list[str] = []
-    for judge, ranking in judge_rankings.items():
-        if "full_revised" not in ranking or "direct_write" not in ranking or "full_unrevised" not in ranking:
-            failures.append(f"{judge} ranking missing required method.")
+    required_methods = set(METHOD_ORDER)
+    for judge in REQUIRED_JUDGES:
+        ranking = judge_rankings.get(judge)
+        if not ranking:
+            failures.append(f"{judge} ranking missing.")
+            continue
+        unknown = sorted(set(ranking) - required_methods)
+        missing = sorted(required_methods - set(ranking))
+        if unknown:
+            failures.append(f"{judge} ranking has unknown methods: {', '.join(unknown)}.")
+        if missing:
+            failures.append(f"{judge} ranking missing required methods: {', '.join(missing)}.")
+        if len(ranking) != len(set(ranking)):
+            failures.append(f"{judge} ranking contains duplicate methods.")
+        if unknown or missing or len(ranking) != len(set(ranking)):
             continue
         if ranking.index("full_revised") > ranking.index("direct_write"):
             failures.append(f"{judge}: direct_write beats full_revised.")
@@ -159,6 +172,10 @@ def decide_acceptance(case_id: str, iteration_id: int, judge_rankings: dict[str,
             "Increase character pressure and scene flow.",
         ] if failures else [],
     }
+
+
+def iteration_root(output_root: Path, iteration: int) -> Path:
+    return output_root / f"iter_{iteration:02d}"
 
 
 def collect_previous_summaries(run_dir: Path, chapter_id: int) -> str:
@@ -398,7 +415,7 @@ def main() -> int:
 
     load_dotenv(ROOT / ".env")
     for iteration in range(1, args.max_iterations + 1):
-        iter_root = args.output_root / f"iteration_{iteration:02d}"
+        iter_root = iteration_root(args.output_root, iteration)
         iter_root.mkdir(parents=True, exist_ok=True)
         for case in args.cases:
             runner = V1RevisionRun(
