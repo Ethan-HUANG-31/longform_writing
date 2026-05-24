@@ -200,12 +200,15 @@ class V1RevisionRun:
         return read_text(self.skill_path / "core_spec" / "prompts" / filename)
 
     def ensure_unrevised_draft(self) -> None:
-        if (self.run_dir / "manuscript" / "final.md").exists():
+        final = self.run_dir / "manuscript" / "final.md"
+        final_unrevised = self.run_dir / "manuscript" / "final_unrevised.md"
+        if final.exists():
+            if not final_unrevised.exists():
+                write_text(final_unrevised, final.read_text(encoding="utf-8"))
             return
         self.acceptance.run()
-        final = self.run_dir / "manuscript" / "final.md"
-        if final.exists():
-            write_text(self.run_dir / "manuscript" / "final_unrevised.md", final.read_text(encoding="utf-8"))
+        if final.exists() and not final_unrevised.exists():
+            write_text(final_unrevised, final.read_text(encoding="utf-8"))
 
     def review_chapter(self, chapter_id: int) -> dict[str, Any]:
         chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"

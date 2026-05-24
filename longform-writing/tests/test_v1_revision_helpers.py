@@ -226,6 +226,23 @@ class V1RevisionPromptValueTests(unittest.TestCase):
         self.assertTrue(review["blocking_issues"])
         self.assertEqual(review["blocking_issues"][0]["dimension"], "Scene & Prose Flow")
 
+    def test_ensure_unrevised_draft_copies_existing_final(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            manuscript = run_dir / "manuscript"
+            manuscript.mkdir()
+            (manuscript / "final.md").write_text("existing full draft\n", encoding="utf-8")
+            runner = module.V1RevisionRun.__new__(module.V1RevisionRun)
+            runner.run_dir = run_dir
+
+            runner.ensure_unrevised_draft()
+
+            self.assertEqual(
+                (manuscript / "final_unrevised.md").read_text(encoding="utf-8"),
+                "existing full draft\n",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
