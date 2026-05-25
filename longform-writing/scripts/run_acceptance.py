@@ -242,6 +242,25 @@ def render_template(template: str, values: dict[str, Any]) -> str:
     return rendered
 
 
+def sanitize_scene_beats(beats: Any) -> list[dict[str, Any]]:
+    if not isinstance(beats, list):
+        return []
+    sanitized: list[dict[str, Any]] = []
+    for beat in beats:
+        if not isinstance(beat, dict):
+            continue
+        text = str(beat.get("text", "")).strip()
+        purpose = str(beat.get("purpose", "")).strip()
+        if not text and not purpose:
+            continue
+        copied = dict(beat)
+        copied["text"] = text
+        if "purpose" in copied:
+            copied["purpose"] = purpose
+        sanitized.append(copied)
+    return sanitized
+
+
 CHINESE_NUMERALS = {
     "一": 1,
     "二": 2,
@@ -981,6 +1000,7 @@ class AcceptanceRun:
                 expected_shape='[{"beat_id": 1, "text": "", "purpose": "", "required_codex": [], "reveals": [], "must_not_reveal": []}]',
             )
             beats = redact_protected_reveals_obj(beats, chapter_id)
+            beats = sanitize_scene_beats(beats)
             beats = self.ensure_phase_c_beats(chapter_id, beats)
             beats = self.ensure_required_reveal_beats(chapter_id, chapter, beats)
             if self.expected_validation_guard and chapter_id == 1:

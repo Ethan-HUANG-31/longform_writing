@@ -272,6 +272,10 @@ class V1RevisionRun:
                 write_text(final_unrevised, final.read_text(encoding="utf-8"))
             return
         self.acceptance.run()
+        if not final.exists():
+            report = self.run_dir / "acceptance_report.md"
+            detail = f" See {report}" if report.exists() else ""
+            raise RuntimeError(f"V0 full draft did not produce manuscript/final.md for {self.run_dir}.{detail}")
         if final.exists() and not final_unrevised.exists():
             write_text(final_unrevised, final.read_text(encoding="utf-8"))
 

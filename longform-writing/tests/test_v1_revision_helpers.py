@@ -86,6 +86,15 @@ def load_v1_runner():
     return module
 
 
+def load_acceptance_runner():
+    script = ROOT / "longform-writing" / "scripts" / "run_acceptance.py"
+    spec = importlib.util.spec_from_file_location("run_acceptance", script)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class V1RevisionHelperTests(unittest.TestCase):
     def test_require_external_model_export_approval_rejects_deepseek_without_flag(self) -> None:
         module = load_v1_runner()
@@ -204,6 +213,37 @@ class V1RevisionHelperTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 module.build_blind_package(fake_repo_root, {})
+
+    def test_sanitize_scene_beats_drops_empty_placeholder(self) -> None:
+        module = load_acceptance_runner()
+        beats = [
+            {"beat_id": 1, "text": "小帅按下第三段录像的播放键。", "purpose": "present action"},
+            {"beat_id": 2, "text": "", "purpose": "", "required_codex": []},
+            {"beat_id": 3, "text": "录像揭示小帅删掉风险提示。", "purpose": "past reveal"},
+        ]
+        sanitized = module.sanitize_scene_beats(beats)
+        self.assertEqual([beat["text"] for beat in sanitized], [
+            "小帅按下第三段录像的播放键。",
+            "录像揭示小帅删掉风险提示。",
+        ])
+
+    def test_ensure_unrevised_draft_rejects_incomplete_v0_run(self) -> None:
+        module = load_v1_runner()
+
+        class IncompleteAcceptance:
+            def run(self) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            runner = module.V1RevisionRun.__new__(module.V1RevisionRun)
+            runner.run_dir = run_dir
+            runner.acceptance = IncompleteAcceptance()
+
+            with self.assertRaises(RuntimeError) as ctx:
+                runner.ensure_unrevised_draft()
+
+            self.assertIn("final.md", str(ctx.exception))
 
 
 class V1AcceptanceDecisionTests(unittest.TestCase):
