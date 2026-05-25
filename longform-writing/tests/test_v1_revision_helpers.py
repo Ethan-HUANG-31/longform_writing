@@ -293,6 +293,18 @@ class V1AcceptanceDecisionTests(unittest.TestCase):
             Path("revision_eval_runs/v1_chapter_revision/iter_01"),
         )
 
+    def test_cli_accepts_start_iteration_without_changing_default(self) -> None:
+        module = load_v1_runner()
+        parser = module.build_argument_parser()
+
+        default_args = parser.parse_args([])
+        self.assertEqual(default_args.start_iteration, 1)
+
+        args = parser.parse_args(["--start-iteration", "2", "--max-iterations", "3"])
+        self.assertEqual(args.start_iteration, 2)
+        self.assertEqual(args.max_iterations, 3)
+        self.assertEqual(module.iteration_root(Path("out"), args.start_iteration), Path("out/iter_02"))
+
 
 class V1RevisionPromptValueTests(unittest.TestCase):
     def test_collect_previous_summaries_uses_revised_when_available(self) -> None:
@@ -327,6 +339,17 @@ class V1RevisionPromptValueTests(unittest.TestCase):
         self.assertTrue(review["blocking_issues"])
         self.assertEqual(review["blocking_issues"][0]["dimension"], "Scene & Prose Flow")
 
+    def test_builtin_review_flags_obvious_procedural_prose(self) -> None:
+        module = load_v1_runner()
+        text = (
+            "第一步，他先核对借书卡上的日期。\n"
+            "第二步，他再确认书号和便签纸能对应。\n"
+            "第三步，他最后排除其他可能。"
+        )
+        review = module.builtin_chapter_review(5, text)
+        issues = review["blocking_issues"]
+        self.assertTrue(any("procedural" in issue["issue"].lower() for issue in issues))
+
     def test_ensure_unrevised_draft_copies_existing_final(self) -> None:
         module = load_v1_runner()
         with tempfile.TemporaryDirectory() as tmp:
@@ -344,6 +367,21 @@ class V1RevisionPromptValueTests(unittest.TestCase):
                 "existing full draft\n",
             )
 
+    def test_plan_revision_includes_default_quality_targets_without_blocking_issues(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            (run_dir / "chapters" / "chapter_01").mkdir(parents=True)
+            runner = module.V1RevisionRun.__new__(module.V1RevisionRun)
+            runner.run_dir = run_dir
+
+            plan = runner.plan_revision(1, {"blocking_issues": [], "revision_targets": []})
+
+            self.assertEqual(plan["must_fix"], [])
+            self.assertTrue(plan["quality_targets"])
+            self.assertTrue(any("reveal order" in item for item in plan["quality_targets"]))
+            self.assertTrue(any("whole chapter" in item for item in plan["rewrite_strategy"]))
+
 
 class V1RevisionRewriteFallbackTests(unittest.TestCase):
     def test_apply_builtin_revision_removes_duplicate_paragraphs(self) -> None:
@@ -353,6 +391,56 @@ class V1RevisionRewriteFallbackTests(unittest.TestCase):
         self.assertEqual(revised.count("重复段落很长很长很长。"), 1)
         self.assertTrue(revised.startswith("第一段。"))
         self.assertTrue(revised.strip().endswith("结尾。"))
+
+    def test_rewrite_chapter_calls_model_when_must_fix_is_empty(self) -> None:
+        module = load_v1_runner()
+
+        class FakeClient:
+            def __init__(self) -> None:
+                self.prompts: list[str] = []
+
+            def complete(self, prompt: str, *, max_tokens: int, temperature: float) -> str:
+                self.prompts.append(prompt)
+                return "模型重写后的章节。"
+
+        class FakeAcceptance:
+            def __init__(self) -> None:
+                self.client = FakeClient()
+                self.records: list[tuple] = []
+
+            def read_project(self, path: str) -> str:
+                values = {
+                    "01_project_brief.md": "项目简报",
+                    "chapters/chapter_01/00_summary.md": "章节摘要",
+                }
+                return values.get(path, "")
+
+            def select_codex(self, text: str) -> tuple[list[str], str]:
+                return [], "相关设定"
+
+            def record(self, *args) -> None:
+                self.records.append(args)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            chapter_dir = run_dir / "chapters" / "chapter_01"
+            chapter_dir.mkdir(parents=True)
+            (chapter_dir / "02_draft.md").write_text("原始章节。", encoding="utf-8")
+            runner = module.V1RevisionRun.__new__(module.V1RevisionRun)
+            runner.run_dir = run_dir
+            runner.acceptance = FakeAcceptance()
+            runner.template = lambda filename: (
+                "Original={{original_chapter_text}}\nPlan={{revision_plan}}\nCodex={{relevant_codex}}"
+            )
+
+            revised = runner.rewrite_chapter(1, {"must_fix": [], "quality_targets": ["改善文本质感"]})
+
+            self.assertEqual(revised, "模型重写后的章节。\n")
+            self.assertEqual(len(runner.acceptance.client.prompts), 1)
+            self.assertIn("Original=原始章节。", runner.acceptance.client.prompts[0])
+            self.assertIn('"must_fix": []', runner.acceptance.client.prompts[0])
+            self.assertIn('"改善文本质感"', runner.acceptance.client.prompts[0])
+            self.assertIn("model rewrite", (chapter_dir / "06_revision_notes.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -23,14 +23,19 @@ Return only JSON with this shape:
   ],
   "preserve": [],
   "rewrite_strategy": [],
+  "quality_targets": [],
   "continuity_constraints": [],
   "expected_quality_gains": [],
   "risk_notes": []
 }
 
 Plan requirements:
+- Always plan a whole-chapter prose rewrite, even if must_fix is empty.
+- Keep must_fix for blocking defects only. Put non-blocking prose improvements in quality_targets and rewrite_strategy.
+- quality_targets must cover: turn evidence and clues into character pressure and choices; reduce procedural record-keeping or worksheet feel; use scene, dialogue, concrete action, and reaction to carry information; avoid abstract chapter-ending summary by ending on a concrete action, image, or decision.
 - Remove repetition without deleting required clues.
 - Convert clue confirmation into character pressure where possible.
 - Replace checklist-style deduction with scene, conflict, or dialogue when appropriate.
 - Keep reveal order intact.
 - Keep the chapter's required plot function intact.
+- Strictly preserve existing facts, POV, continuity, and reveal boundaries. Do not add major facts or reveal future information early.

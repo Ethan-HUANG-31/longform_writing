@@ -82,6 +82,47 @@ def find_repetition_signals(text: str) -> list[dict[str, str]]:
     return signals
 
 
+def find_procedural_prose_signals(text: str) -> list[dict[str, str]]:
+    signals: list[dict[str, str]] = []
+    procedural_patterns = [
+        r"(第一步|第二步|第三步|第四步)",
+        r"(首先|其次|然后|最后).{0,24}(确认|核对|排除|得出|说明)",
+        r"(可以得出|由此可见|综上|因此可以判断)",
+    ]
+    for pattern in procedural_patterns:
+        matches = re.findall(pattern, text)
+        if len(matches) >= 2:
+            anchor = re.search(pattern, text)
+            signals.append({
+                "dimension": "Scene & Prose Flow",
+                "location": "procedural deduction",
+                "issue": "Procedural prose makes the scene read like a worksheet instead of fiction.",
+                "evidence": anchor.group(0) if anchor else pattern,
+                "suggested_fix": "Translate the deduction steps into character pressure, dialogue, concrete action, or visible choice.",
+            })
+            break
+
+    evidence_log_markers = re.findall(r"(线索|证据|便签|借书卡|书号|日期).{0,16}(确认|核对|对应|排除)", text)
+    if len(evidence_log_markers) >= 3:
+        signals.append({
+            "dimension": "Scene & Prose Flow",
+            "location": "evidence log",
+            "issue": "Evidence-log repetition keeps restating clue handling instead of escalating pressure.",
+            "evidence": " / ".join("".join(match) for match in evidence_log_markers[:3]),
+            "suggested_fix": "Keep the clue facts, but carry them through scene action, reaction, and consequence instead of repeated logging.",
+        })
+    return signals
+
+
+DEFAULT_QUALITY_TARGETS = [
+    "Turn evidence and clues into character pressure, visible stakes, and choices.",
+    "Reduce procedural record-keeping and worksheet-like deduction.",
+    "Carry information through scene, dialogue, specific action, and reaction.",
+    "End the chapter on a concrete action, image, or decision rather than abstract summary.",
+    "Strictly preserve existing facts, POV, reveal order, and chapter function.",
+]
+
+
 def merge_revised_chapters(run_dir: Path) -> str:
     parts: list[str] = []
     manifest_rows: list[dict[str, str]] = []
@@ -200,6 +241,7 @@ def collect_previous_summaries(run_dir: Path, chapter_id: int) -> str:
 
 def builtin_chapter_review(chapter_id: int, chapter_text: str) -> dict[str, Any]:
     issues = find_repetition_signals(chapter_text)
+    issues.extend(find_procedural_prose_signals(chapter_text))
     checklist_markers = ["**一、", "**二、", "**三、", "一、旧", "二、日期", "三、书号"]
     if any(marker in chapter_text for marker in checklist_markers):
         issues.append({
@@ -217,7 +259,7 @@ def builtin_chapter_review(chapter_id: int, chapter_text: str) -> dict[str, Any]
         "strengths_to_preserve": [],
         "blocking_issues": issues,
         "continuity_risks": [],
-        "revision_targets": [issue["suggested_fix"] for issue in issues],
+        "revision_targets": [issue["suggested_fix"] for issue in issues] or DEFAULT_QUALITY_TARGETS,
     }
 
 
@@ -293,6 +335,7 @@ class V1RevisionRun:
         return builtin
 
     def plan_revision(self, chapter_id: int, review: dict[str, Any]) -> dict[str, Any]:
+        quality_targets = list(dict.fromkeys(DEFAULT_QUALITY_TARGETS + review.get("revision_targets", [])))
         plan = {
             "chapter_id": chapter_id,
             "must_fix": [
@@ -305,12 +348,19 @@ class V1RevisionRun:
             ],
             "preserve": ["Preserve required plot facts, reveal order, POV, and chapter function."],
             "rewrite_strategy": [
-                "Compress repeated object handling.",
-                "Convert clue confirmation into character pressure.",
-                "Replace checklist deduction with scene or dialogue when possible.",
+                "Revise the whole chapter for prose quality even when there are no blocking issues.",
+                "Compress repeated object handling without deleting required clues.",
+                "Convert clue confirmation into character pressure and visible choice.",
+                "Replace checklist deduction with scene, concrete action, reaction, or dialogue when possible.",
+                "Close on a specific action, image, or decision instead of an abstract explanation.",
             ],
-            "continuity_constraints": ["Do not add new major facts that contradict previous summaries."],
-            "expected_quality_gains": review.get("revision_targets", []),
+            "quality_targets": quality_targets,
+            "continuity_constraints": [
+                "Do not add new major facts that contradict previous summaries.",
+                "Do not change required facts, POV, reveal order, or chapter function.",
+                "Do not reveal future information earlier than the original chapter allows.",
+            ],
+            "expected_quality_gains": quality_targets,
             "risk_notes": [],
         }
         chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"
@@ -324,49 +374,46 @@ class V1RevisionRun:
     def rewrite_chapter(self, chapter_id: int, revision_plan: dict[str, Any]) -> str:
         chapter_dir = self.run_dir / "chapters" / f"chapter_{chapter_id:02d}"
         original = read_text(chapter_dir / "02_draft.md")
-        must_fix = revision_plan.get("must_fix", [])
-        if not must_fix:
+        chapter_summary = self.acceptance.read_project(f"chapters/chapter_{chapter_id:02d}/00_summary.md")
+        _, relevant_codex = self.acceptance.select_codex(original + "\n\n" + chapter_summary)
+        rendered = render_template(
+            self.template("14_rewrite_chapter.md"),
+            {
+                "project_brief": self.acceptance.read_project("01_project_brief.md"),
+                "previous_summaries": collect_previous_summaries(self.run_dir, chapter_id),
+                "chapter_summary": chapter_summary,
+                "relevant_codex": relevant_codex,
+                "original_chapter_text": original,
+                "revision_plan": revision_plan,
+            },
+        )
+        model_revised = self.acceptance.client.complete(rendered, max_tokens=4200, temperature=0.25).strip()
+        if not model_revised or model_revised == "MOCK_OUTPUT":
             revised = original
-            notes = "No blocking revision items; original chapter preserved.\n"
+            notes = "Model rewrite was empty or MOCK_OUTPUT; original chapter preserved as fallback.\n"
+            record_status = "fallback"
         else:
-            chapter_summary = self.acceptance.read_project(f"chapters/chapter_{chapter_id:02d}/00_summary.md")
-            _, relevant_codex = self.acceptance.select_codex(original + "\n\n" + chapter_summary)
-            rendered = render_template(
-                self.template("14_rewrite_chapter.md"),
-                {
-                    "project_brief": self.acceptance.read_project("01_project_brief.md"),
-                    "previous_summaries": collect_previous_summaries(self.run_dir, chapter_id),
-                    "chapter_summary": chapter_summary,
-                    "relevant_codex": relevant_codex,
-                    "original_chapter_text": original,
-                    "revision_plan": revision_plan,
-                },
-            )
-            model_revised = self.acceptance.client.complete(rendered, max_tokens=4200, temperature=0.25).strip()
-            if not model_revised or model_revised == "MOCK_OUTPUT":
-                revised = apply_builtin_revision(original)
-                notes = "Used builtin duplicate-paragraph fallback because model rewrite was empty or MOCK_OUTPUT.\n"
-            else:
-                revised = model_revised.strip() + "\n"
-                notes = "Used model rewrite from 14_rewrite_chapter.md.\n"
-            self.acceptance.record(
-                "rewrite_chapter",
-                "core_spec/prompts/14_rewrite_chapter.md",
-                rendered,
-                [
-                    "01_project_brief.md",
-                    "02_codex.json",
-                    f"chapters/chapter_{chapter_id:02d}/00_summary.md",
-                    f"chapters/chapter_{chapter_id:02d}/02_draft.md",
-                    f"chapters/chapter_{chapter_id:02d}/05_revision_plan.json",
-                ],
-                [
-                    f"chapters/chapter_{chapter_id:02d}/02_revised_draft.md",
-                    f"chapters/chapter_{chapter_id:02d}/06_revision_notes.md",
-                ],
-                "success",
-                ["Project Brief", "Previous Summaries", "Chapter Summary", "Relevant Codex", "Revision Plan"],
-            )
+            revised = model_revised.strip() + "\n"
+            notes = "Used model rewrite from 14_rewrite_chapter.md.\n"
+            record_status = "success"
+        self.acceptance.record(
+            "rewrite_chapter",
+            "core_spec/prompts/14_rewrite_chapter.md",
+            rendered,
+            [
+                "01_project_brief.md",
+                "02_codex.json",
+                f"chapters/chapter_{chapter_id:02d}/00_summary.md",
+                f"chapters/chapter_{chapter_id:02d}/02_draft.md",
+                f"chapters/chapter_{chapter_id:02d}/05_revision_plan.json",
+            ],
+            [
+                f"chapters/chapter_{chapter_id:02d}/02_revised_draft.md",
+                f"chapters/chapter_{chapter_id:02d}/06_revision_notes.md",
+            ],
+            record_status,
+            ["Project Brief", "Previous Summaries", "Chapter Summary", "Relevant Codex", "Revision Plan"],
+        )
         write_text(chapter_dir / "02_revised_draft.md", revised.strip() + "\n")
         write_text(chapter_dir / "06_revision_notes.md", notes)
         return revised
@@ -415,16 +462,26 @@ class V1RevisionRun:
         return merge_revised_chapters(self.run_dir)
 
 
-def main() -> int:
+def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skill-path", type=Path, default=ROOT / "longform-writing")
     parser.add_argument("--test-dir", type=Path, default=ROOT / "test_cases")
     parser.add_argument("--output-root", type=Path, default=ROOT / "revision_eval_runs" / "v1_chapter_revision")
     parser.add_argument("--provider", choices=["deepseek"], default="deepseek")
     parser.add_argument("--cases", nargs="*", default=DEFAULT_CASES)
+    parser.add_argument("--start-iteration", type=int, default=1)
     parser.add_argument("--max-iterations", type=int, default=3)
     parser.add_argument("--allow-external-model-export", action="store_true")
+    return parser
+
+
+def main() -> int:
+    parser = build_argument_parser()
     args = parser.parse_args()
+    if args.start_iteration < 1:
+        parser.error("--start-iteration must be >= 1")
+    if args.max_iterations < args.start_iteration:
+        parser.error("--max-iterations must be >= --start-iteration")
 
     try:
         require_external_model_export_approval(args.provider, args.allow_external_model_export)
@@ -432,7 +489,7 @@ def main() -> int:
         parser.error(str(exc))
 
     load_dotenv(ROOT / ".env")
-    for iteration in range(1, args.max_iterations + 1):
+    for iteration in range(args.start_iteration, args.max_iterations + 1):
         iter_root = iteration_root(args.output_root, iteration)
         iter_root.mkdir(parents=True, exist_ok=True)
         for case in args.cases:
