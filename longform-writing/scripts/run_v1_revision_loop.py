@@ -123,6 +123,20 @@ DEFAULT_QUALITY_TARGETS = [
 ]
 
 
+MANUSCRIPT_OVERUSE_TERMS = [
+    "纸纤维",
+    "涂黑",
+    "签名",
+    "确认",
+    "核对",
+    "对应",
+    "排除",
+    "这说明",
+    "这意味着",
+    "终于明白",
+]
+
+
 def merge_revised_chapters(run_dir: Path) -> str:
     parts: list[str] = []
     manifest_rows: list[dict[str, str]] = []
@@ -239,10 +253,75 @@ def collect_previous_summaries(run_dir: Path, chapter_id: int) -> str:
     return "\n\n".join(chunks)
 
 
+def collect_previous_revised_tail(run_dir: Path, chapter_id: int, max_chars: int = 900) -> str:
+    previous_id = chapter_id - 1
+    if previous_id < 1:
+        return ""
+    chapter_dir = run_dir / "chapters" / f"chapter_{previous_id:02d}"
+    revised = chapter_dir / "02_revised_draft.md"
+    original = chapter_dir / "02_draft.md"
+    chosen = revised if revised.exists() and revised.read_text(encoding="utf-8").strip() else original
+    if not chosen.exists():
+        return ""
+    text = chosen.read_text(encoding="utf-8").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
+
+
+def build_manuscript_revision_context(run_dir: Path, chapter_id: int) -> str:
+    chapter_texts = []
+    for chapter_dir in sorted((run_dir / "chapters").glob("chapter_*")):
+        draft = chapter_dir / "02_draft.md"
+        if draft.exists():
+            chapter_texts.append(draft.read_text(encoding="utf-8"))
+    manuscript_text = "\n\n".join(chapter_texts)
+    lines = [
+        "## Manuscript-Level Revision Context",
+        "",
+        "Use this only to reduce reader-visible repetition and improve cross-chapter flow.",
+        "Do not introduce future facts into the current chapter; preserve the current chapter's reveal boundary.",
+        "",
+        "Persistent revision targets:",
+        "- Keep required clues, but delete redundant inspection gestures after the clue is established.",
+        "- Avoid numbered or list-like deduction; convert it into scene movement, dialogue, hesitation, or decision.",
+        "- Each clue paragraph should change what the protagonist does, risks, admits, or chooses.",
+        "- Prefer one vivid consequence over several repeated confirmations.",
+    ]
+    if not manuscript_text:
+        return "\n".join(lines)
+
+    overused = [(term, manuscript_text.count(term)) for term in MANUSCRIPT_OVERUSE_TERMS]
+    overused = [(term, count) for term, count in overused if count >= 4]
+    numbered_count = len(re.findall(r"(第一|第二|第三|第四|线索一|线索二|线索三|证据一|证据二|证据三)", manuscript_text))
+    if overused or numbered_count >= 5:
+        lines.extend(["", "Detected manuscript-level anti-patterns:"])
+        for term, count in overused:
+            lines.append(f"- `{term}` appears {count} times; keep the fact but avoid repeating the same word or gesture.")
+        if numbered_count >= 5:
+            lines.append(
+                f"- numbered or list-like deduction markers appear {numbered_count} times; remove list structure from prose."
+            )
+    return "\n".join(lines)
+
+
 def builtin_chapter_review(chapter_id: int, chapter_text: str) -> dict[str, Any]:
     issues = find_repetition_signals(chapter_text)
     issues.extend(find_procedural_prose_signals(chapter_text))
-    checklist_markers = ["**一、", "**二、", "**三、", "一、旧", "二、日期", "三、书号"]
+    checklist_markers = [
+        "**一、",
+        "**二、",
+        "**三、",
+        "一、旧",
+        "二、日期",
+        "三、书号",
+        "第一、",
+        "第二、",
+        "第三、",
+        "第一，",
+        "第二，",
+        "第三，",
+    ]
     if any(marker in chapter_text for marker in checklist_markers):
         issues.append({
             "dimension": "Scene & Prose Flow",
@@ -353,6 +432,7 @@ class V1RevisionRun:
                 "Convert clue confirmation into character pressure and visible choice.",
                 "Replace checklist deduction with scene, concrete action, reaction, or dialogue when possible.",
                 "Close on a specific action, image, or decision instead of an abstract explanation.",
+                "Cut repeated proof gestures across chapters; one established clue should create new pressure instead of another confirmation.",
             ],
             "quality_targets": quality_targets,
             "continuity_constraints": [
@@ -381,8 +461,10 @@ class V1RevisionRun:
             {
                 "project_brief": self.acceptance.read_project("01_project_brief.md"),
                 "previous_summaries": collect_previous_summaries(self.run_dir, chapter_id),
+                "previous_revised_tail": collect_previous_revised_tail(self.run_dir, chapter_id),
                 "chapter_summary": chapter_summary,
                 "relevant_codex": relevant_codex,
+                "manuscript_revision_context": build_manuscript_revision_context(self.run_dir, chapter_id),
                 "original_chapter_text": original,
                 "revision_plan": revision_plan,
             },

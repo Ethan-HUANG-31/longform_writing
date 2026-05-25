@@ -43,11 +43,13 @@ Return only JSON with this shape:
 Required checks:
 - Identify repeated object inspection, repeated deduction, or repeated line-level wording.
 - Identify visible beat expansion, procedural prose, evidence-log repetition, or checklist-style deduction.
+- Identify numbered/list-style deduction such as "第一、第二、第三", "线索一/二/三", arrows, or explicit worksheet chains.
+- Identify repeated proof gestures where the prose keeps confirming a clue after the reader already understands it.
 - Identify summary-like emotional conclusions where character pressure should be dramatized.
 - Identify dialogue that only transmits information without conflict, subtext, or pressure.
 - Identify genre payoff that is mechanically correct but emotionally weak.
 - Preserve required facts, reveal order, POV, and chapter function.
 - Do not ask for changes that alter facts, add new major events, or reveal information earlier than this chapter originally permits.
-- Even when no blocking issue exists, revision_targets should include conservative prose-level quality targets: turn clues into character pressure and choices; reduce worksheet-like record keeping; use scene, dialogue, and concrete action to carry information; end on a concrete action, image, or decision rather than abstract summary.
+- Even when no blocking issue exists, revision_targets should include conservative prose-level quality targets: turn clues into character pressure and choices; reduce worksheet-like record keeping; use scene, dialogue, and concrete action to carry information; avoid repeated proof gestures; end on a concrete action, image, or decision rather than abstract summary.
 
 Evidence is mandatory. If no evidence supports an issue, omit that issue.

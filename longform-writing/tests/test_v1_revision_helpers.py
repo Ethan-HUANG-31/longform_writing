@@ -30,6 +30,8 @@ class V1PromptAndSchemaContractTests(unittest.TestCase):
                 "{{original_chapter_text}}",
                 "{{revision_plan}}",
                 "{{previous_summaries}}",
+                "{{previous_revised_tail}}",
+                "{{manuscript_revision_context}}",
                 "{{relevant_codex}}",
             ],
             "15_summarize_revised_chapter.md": [
@@ -331,6 +333,44 @@ class V1RevisionPromptValueTests(unittest.TestCase):
             self.assertNotIn("current chapter", result)
             self.assertNotIn("future chapter", result)
 
+    def test_collect_previous_revised_tail_uses_revised_draft_only_from_previous_chapter(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            c1 = run_dir / "chapters" / "chapter_01"
+            c2 = run_dir / "chapters" / "chapter_02"
+            c3 = run_dir / "chapters" / "chapter_03"
+            c1.mkdir(parents=True)
+            c2.mkdir(parents=True)
+            c3.mkdir(parents=True)
+            (c1 / "02_revised_draft.md").write_text("第一章修订尾部。", encoding="utf-8")
+            (c2 / "02_revised_draft.md").write_text("第二章修订尾部。", encoding="utf-8")
+            (c3 / "02_revised_draft.md").write_text("第三章不应进入。", encoding="utf-8")
+
+            result = module.collect_previous_revised_tail(run_dir, 3, max_chars=20)
+
+            self.assertIn("第二章修订尾部", result)
+            self.assertNotIn("第一章修订尾部", result)
+            self.assertNotIn("第三章不应进入", result)
+
+    def test_build_manuscript_revision_context_flags_overused_procedural_terms(self) -> None:
+        module = load_v1_runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            c1 = run_dir / "chapters" / "chapter_01"
+            c2 = run_dir / "chapters" / "chapter_02"
+            c1.mkdir(parents=True)
+            c2.mkdir(parents=True)
+            repeated = "第一，他确认纸纤维。第二，他再次确认纸纤维。第三，他排除其他可能。"
+            (c1 / "02_draft.md").write_text(repeated, encoding="utf-8")
+            (c2 / "02_draft.md").write_text(repeated, encoding="utf-8")
+
+            result = module.build_manuscript_revision_context(run_dir, 1)
+
+            self.assertIn("Manuscript-Level Revision Context", result)
+            self.assertIn("纸纤维", result)
+            self.assertIn("numbered or list-like deduction", result)
+
     def test_builtin_review_injects_repetition_findings(self) -> None:
         module = load_v1_runner()
         text = "小帅将报告举到灯光下。\n\n小帅将报告举到灯光下。"
@@ -430,7 +470,11 @@ class V1RevisionRewriteFallbackTests(unittest.TestCase):
             runner.run_dir = run_dir
             runner.acceptance = FakeAcceptance()
             runner.template = lambda filename: (
-                "Original={{original_chapter_text}}\nPlan={{revision_plan}}\nCodex={{relevant_codex}}"
+                "Original={{original_chapter_text}}\n"
+                "Plan={{revision_plan}}\n"
+                "Codex={{relevant_codex}}\n"
+                "Tail={{previous_revised_tail}}\n"
+                "Manuscript={{manuscript_revision_context}}"
             )
 
             revised = runner.rewrite_chapter(1, {"must_fix": [], "quality_targets": ["改善文本质感"]})
@@ -440,6 +484,7 @@ class V1RevisionRewriteFallbackTests(unittest.TestCase):
             self.assertIn("Original=原始章节。", runner.acceptance.client.prompts[0])
             self.assertIn('"must_fix": []', runner.acceptance.client.prompts[0])
             self.assertIn('"改善文本质感"', runner.acceptance.client.prompts[0])
+            self.assertIn("Manuscript=## Manuscript-Level Revision Context", runner.acceptance.client.prompts[0])
             self.assertIn("model rewrite", (chapter_dir / "06_revision_notes.md").read_text(encoding="utf-8"))
 
 
