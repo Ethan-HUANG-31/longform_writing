@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import http.client
+import os
 import unittest
 import importlib.util
 import tempfile
@@ -110,6 +112,47 @@ class V1RevisionHelperTests(unittest.TestCase):
         module = load_v1_runner()
 
         module.require_external_model_export_approval("deepseek", True)
+
+    def test_model_client_retries_incomplete_read(self) -> None:
+        module = load_acceptance_runner()
+        calls = {"count": 0}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({
+                    "choices": [{"message": {"content": "retry ok"}}],
+                }).encode("utf-8")
+
+        def fake_urlopen(request, timeout):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise http.client.IncompleteRead(b"")
+            return FakeResponse()
+
+        old_urlopen = module.urllib.request.urlopen
+        old_env = {key: os.environ.get(key) for key in ["DEEPSEEK_API_KEY", "DEEPSEEK_MAX_RETRIES", "DEEPSEEK_RETRY_BASE_DELAY"]}
+        try:
+            os.environ["DEEPSEEK_API_KEY"] = "test-key"
+            os.environ["DEEPSEEK_MAX_RETRIES"] = "2"
+            os.environ["DEEPSEEK_RETRY_BASE_DELAY"] = "0"
+            module.urllib.request.urlopen = fake_urlopen
+            client = module.ModelClient("deepseek")
+
+            self.assertEqual(client.complete("hello"), "retry ok")
+            self.assertEqual(calls["count"], 2)
+        finally:
+            module.urllib.request.urlopen = old_urlopen
+            for key, value in old_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def test_find_repetition_signals_detects_repeated_object_handling(self) -> None:
         module = load_v1_runner()

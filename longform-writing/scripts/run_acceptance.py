@@ -8,6 +8,7 @@ skill workflow, not a polished product runtime.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -182,6 +183,8 @@ class ModelClient:
         self.base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
         self.endpoint = endpoint_from_base_url(self.base_url)
         self.model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+        self.max_retries = int(os.environ.get("DEEPSEEK_MAX_RETRIES", "3"))
+        self.retry_base_delay = float(os.environ.get("DEEPSEEK_RETRY_BASE_DELAY", "1.0"))
 
     def complete(self, prompt: str, *, max_tokens: int = 1200, temperature: float = 0.2) -> str:
         if self.provider == "mock":
@@ -193,21 +196,36 @@ class ModelClient:
             "max_tokens": max_tokens,
             "stream": False,
         }
-        request = urllib.request.Request(
-            self.endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=180) as response:
-                raw = response.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"HTTP {exc.code}: {body[:1000]}") from exc
+        raw = ""
+        for attempt in range(1, self.max_retries + 1):
+            request = urllib.request.Request(
+                self.endpoint,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=180) as response:
+                    raw = response.read().decode("utf-8")
+                break
+            except urllib.error.HTTPError as exc:
+                body = exc.read().decode("utf-8", errors="replace")
+                if exc.code not in {408, 409, 429, 500, 502, 503, 504} or attempt >= self.max_retries:
+                    raise RuntimeError(f"HTTP {exc.code}: {body[:1000]}") from exc
+                time.sleep(self.retry_base_delay * attempt)
+            except (
+                TimeoutError,
+                ConnectionError,
+                http.client.IncompleteRead,
+                http.client.RemoteDisconnected,
+                urllib.error.URLError,
+            ) as exc:
+                if attempt >= self.max_retries:
+                    raise RuntimeError(f"Model request failed after {self.max_retries} attempts: {exc}") from exc
+                time.sleep(self.retry_base_delay * attempt)
         data = json.loads(raw)
         return data["choices"][0]["message"]["content"]
 
