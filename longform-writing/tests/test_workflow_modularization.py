@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,11 +13,22 @@ SCRIPTS = ROOT / "longform-writing" / "scripts"
 
 
 def load_module(name: str, filename: str):
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / filename)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def snapshot_tree(root: Path) -> dict[str, str]:
+    return {
+        str(path.relative_to(root)): path.read_text(encoding="utf-8")
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
 
 
 class WorkflowModularizationTests(unittest.TestCase):
@@ -104,7 +116,7 @@ class WorkflowModularizationTests(unittest.TestCase):
                 json.dumps(manifest, ensure_ascii=False) + "\n",
                 encoding="utf-8",
             )
-            before = {rel: (run_dir / rel).read_text(encoding="utf-8") for rel in files}
+            before = snapshot_tree(run_dir)
 
             result = core.WorkflowResult(
                 success=True,
@@ -125,8 +137,9 @@ class WorkflowModularizationTests(unittest.TestCase):
             )
             checker.write_report()
 
-            self.assertTrue((run_dir / "acceptance_report.md").exists())
-            after = {rel: (run_dir / rel).read_text(encoding="utf-8") for rel in files}
+            after = snapshot_tree(run_dir)
+            report = after.pop("acceptance_report.md", None)
+            self.assertIsNotNone(report)
             self.assertEqual(before, after)
 
     def test_run_acceptance_keeps_compatibility_exports(self) -> None:
